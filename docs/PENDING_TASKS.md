@@ -1,0 +1,39 @@
+# Pending Tasks
+
+## Phase 7 - Logging and Observability
+
+- Structured logging hardening
+- Correlation ID propagation across requests and worker boundaries
+- Add worker health and queue-depth visibility
+- Add operational metrics for job throughput and failure rates
+- Add structured logging consistency between FastAPI and Celery worker processes
+
+## Phase 8 - Testing
+
+- Unit tests
+- Integration tests
+- API contract tests
+- Celery worker execution tests
+- MongoDB repository tests
+- End-to-end status persistence tests
+- Performance and load benchmarks as automated tests
+
+## Phase 9 - Deployment
+
+- Docker configuration
+- Kubernetes deployment manifests
+- Production worker startup configuration
+- Redis deployment and operational configuration
+- MongoDB deployment and connection configuration
+
+## Phase 10 - Operational Hardening
+
+- Add retry policy for recoverable Celery task failures
+- Add dead-letter or failure handling strategy for permanently failed jobs
+- Add request/result retention policy for Redis-backed job data
+- Add retention and archival policy for MongoDB job documents
+- Add input size limits and request throttling safeguards
+
+## Maintenance Rule
+
+This file must be updated after each completed task so that pending work always reflects the current project state.

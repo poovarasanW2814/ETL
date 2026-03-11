@@ -37,6 +37,23 @@ dist/
 .eggs/
 
 # ------------------------------
+# Frontend build files
+# ------------------------------
+mcp-transform-ui/node_modules/
+mcp-transform-ui/dist/
+mcp-transform-ui/.vite/
+mcp-transform-ui/coverage/
+mcp-transform-ui/npm-debug.log*
+mcp-transform-ui/yarn-debug.log*
+mcp-transform-ui/yarn-error.log*
+mcp-transform-ui/pnpm-debug.log*
+mcp-transform-ui/.env.local
+mcp-transform-ui/.env.development.local
+mcp-transform-ui/.env.test.local
+mcp-transform-ui/.env.production.local
+mcp-transform-ui/package-lock.json
+
+# ------------------------------
 # Pytest
 # ------------------------------
 .pytest_cache/
@@ -76,6 +93,7 @@ docker-data/
 # ------------------------------
 *.tmp
 *.swp
+*.bak
 
 # ------------------------------
 # Jupyter notebooks
