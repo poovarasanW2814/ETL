@@ -123,14 +123,10 @@ function Dashboard() {
               throughput from the live backend.
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-ink px-4 py-3 text-white dark:bg-slate-800">
               <p className="text-xs uppercase tracking-[0.2em] text-slate-300 dark:text-slate-400">Jobs</p>
               <p className="mt-1 text-2xl font-extrabold">{jobs.length}</p>
-            </div>
-            <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-slate-200 transition-colors duration-300 dark:bg-slate-900 dark:ring-slate-700">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Refresh</p>
-              <p className="mt-1 text-2xl font-extrabold text-ink dark:text-slate-100">10s</p>
             </div>
             <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-slate-200 transition-colors duration-300 dark:bg-slate-900 dark:ring-slate-700">
               <p className="text-xs uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Source</p>
