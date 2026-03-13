@@ -1,4 +1,4 @@
-"""Prompt analysis using Ollama."""
+"""Prompt analysis using Gemini."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import re
 
 import requests
 
-from app.agents.ai_provider import get_prompt_analysis_provider
+from app.agents.ai_provider import GeminiPromptAnalysisProvider
 from app.agents.format_resolver import normalize_resolved_format
 from app.core.settings import settings
 from app.logging.logger import logger
@@ -84,21 +84,28 @@ def analyze_prompt_plan(prompt: str) -> dict[str, object] | None:
     logger.info(
         "Using AI provider to resolve prompt format",
         prompt=prompt,
-        ai_provider=settings.ai_provider,
-        ai_primary_model=settings.ai_primary_model,
-        ai_fallback_model=settings.ai_fallback_model,
+        ai_provider="gemini",
+        ai_primary_model=settings.gemini_model,
+        ai_fallback_model=None,
     )
 
     try:
-        provider = get_prompt_analysis_provider()
+        if not settings.gemini_api_key:
+            raise ValueError("GEMINI_API_KEY is required")
+        provider = GeminiPromptAnalysisProvider(
+            base_url=settings.gemini_base_url,
+            model=settings.gemini_model,
+            api_key=settings.gemini_api_key,
+            timeout_seconds=settings.ai_timeout_seconds,
+        )
         candidate_responses = provider.iter_candidate_responses(_build_prompt(prompt))
     except requests.RequestException as exc:
         logger.exception(
             "AI provider request failed",
             error=str(exc),
-            ai_provider=settings.ai_provider,
-            ai_primary_model=settings.ai_primary_model,
-            ai_fallback_model=settings.ai_fallback_model,
+            ai_provider="gemini",
+            ai_primary_model=settings.gemini_model,
+            ai_fallback_model=None,
         )
         return None
     except ValueError as exc:
@@ -111,7 +118,7 @@ def analyze_prompt_plan(prompt: str) -> dict[str, object] | None:
             if raw_plan is None:
                 logger.warning(
                     "AI provider returned an invalid plan payload",
-                    ai_provider=settings.ai_provider,
+                    ai_provider="gemini",
                     ai_model=model_used,
                 )
                 continue
@@ -128,7 +135,7 @@ def analyze_prompt_plan(prompt: str) -> dict[str, object] | None:
             if target_format is None:
                 logger.warning(
                     "AI provider returned an invalid date format",
-                    ai_provider=settings.ai_provider,
+                    ai_provider="gemini",
                     ai_model=model_used,
                 )
                 continue
@@ -146,7 +153,7 @@ def analyze_prompt_plan(prompt: str) -> dict[str, object] | None:
 
             logger.info(
                 "AI provider resolved transformation plan",
-                ai_provider=settings.ai_provider,
+                ai_provider="gemini",
                 ai_model=model_used,
                 target_format=target_format,
                 confidence=confidence,
@@ -156,17 +163,17 @@ def analyze_prompt_plan(prompt: str) -> dict[str, object] | None:
         logger.exception(
             "AI provider request failed",
             error=str(exc),
-            ai_provider=settings.ai_provider,
-            ai_primary_model=settings.ai_primary_model,
-            ai_fallback_model=settings.ai_fallback_model,
+            ai_provider="gemini",
+            ai_primary_model=settings.gemini_model,
+            ai_fallback_model=None,
         )
         return None
 
     logger.warning(
         "All AI model attempts failed semantic validation",
-        ai_provider=settings.ai_provider,
-        ai_primary_model=settings.ai_primary_model,
-        ai_fallback_model=settings.ai_fallback_model,
+        ai_provider="gemini",
+        ai_primary_model=settings.gemini_model,
+        ai_fallback_model=None,
     )
     return None
 

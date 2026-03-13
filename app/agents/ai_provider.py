@@ -1,4 +1,4 @@
-"""Configurable AI provider implementations for prompt analysis."""
+"""Gemini-backed AI provider implementation for prompt analysis."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from typing import Protocol
 
 import requests
 
-from app.core.settings import settings
 from app.logging.logger import logger
 
 
@@ -21,76 +20,66 @@ class PromptAnalysisProvider(Protocol):
 
 
 @dataclass(slots=True)
-class OllamaPromptAnalysisProvider:
-    """Ollama-backed prompt analysis provider."""
+class GeminiPromptAnalysisProvider:
+    """Gemini-backed prompt analysis provider."""
 
     base_url: str
-    primary_model: str
-    fallback_model: str | None
+    model: str
+    api_key: str
     timeout_seconds: int
 
-    def _call_model(self, model: str, instruction_prompt: str) -> str:
-        """Call a specific Ollama model and return the raw response text."""
+    def _call_model(self, instruction_prompt: str) -> str:
+        """Call Gemini and return the raw candidate text."""
+
         response = requests.post(
-            f"{self.base_url.rstrip('/')}/api/generate",
+            f"{self.base_url.rstrip('/')}/models/{self.model}:generateContent",
+            params={"key": self.api_key},
             json={
-                "model": model,
-                "prompt": instruction_prompt,
-                "stream": False,
-                "format": "json",
-                "options": {
+                "contents": [
+                    {
+                        "parts": [
+                            {
+                                "text": instruction_prompt,
+                            }
+                        ]
+                    }
+                ],
+                "generationConfig": {
                     "temperature": 0,
+                    "responseMimeType": "application/json",
                 },
             },
             timeout=self.timeout_seconds,
         )
         response.raise_for_status()
         payload = response.json()
-        return payload.get("response", "")
+        candidates = payload.get("candidates") or []
+        if not candidates:
+            return ""
+
+        content = candidates[0].get("content") or {}
+        parts = content.get("parts") or []
+        if not parts:
+            return ""
+
+        return str(parts[0].get("text", ""))
 
     def iter_candidate_responses(self, instruction_prompt: str) -> Iterator[tuple[str, str]]:
-        """Yield candidate responses from the configured model chain one at a time."""
+        """Yield a single Gemini response paired with the model used."""
 
-        models_to_try = [self.primary_model]
-        if self.fallback_model and self.fallback_model != self.primary_model:
-            models_to_try.append(self.fallback_model)
-
-        last_error: requests.RequestException | None = None
-        for model in models_to_try:
-            started_at = time.perf_counter()
-            logger.info("Starting AI model attempt", ai_model=model, timeout_seconds=self.timeout_seconds)
-            try:
-                raw_response = self._call_model(model, instruction_prompt)
-                elapsed = round(time.perf_counter() - started_at, 3)
-                logger.info("Completed AI model attempt", ai_model=model, elapsed_seconds=elapsed)
-                yield raw_response, model
-            except requests.RequestException as exc:
-                elapsed = round(time.perf_counter() - started_at, 3)
-                logger.warning(
-                    "AI model attempt failed",
-                    ai_model=model,
-                    elapsed_seconds=elapsed,
-                    error=str(exc),
-                )
-                last_error = exc
-                continue
-
-        if last_error is not None:
-            raise last_error
-
-        raise ValueError("No Ollama models configured")
-
-
-def get_prompt_analysis_provider() -> PromptAnalysisProvider:
-    """Return the configured AI provider implementation."""
-
-    provider_name = settings.ai_provider.lower()
-    if provider_name == "ollama":
-        return OllamaPromptAnalysisProvider(
-            base_url=settings.ollama_base_url,
-            primary_model=settings.ai_primary_model,
-            fallback_model=settings.ai_fallback_model,
-            timeout_seconds=settings.ai_timeout_seconds,
-        )
-
-    raise ValueError(f"Unsupported AI provider: {settings.ai_provider}")
+        started_at = time.perf_counter()
+        logger.info("Starting AI model attempt", ai_model=self.model, timeout_seconds=self.timeout_seconds)
+        try:
+            raw_response = self._call_model(instruction_prompt)
+            elapsed = round(time.perf_counter() - started_at, 3)
+            logger.info("Completed AI model attempt", ai_model=self.model, elapsed_seconds=elapsed)
+            yield raw_response, self.model
+        except requests.RequestException as exc:
+            elapsed = round(time.perf_counter() - started_at, 3)
+            logger.warning(
+                "AI model attempt failed",
+                ai_model=self.model,
+                elapsed_seconds=elapsed,
+                error=str(exc),
+            )
+            raise

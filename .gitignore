@@ -51,7 +51,6 @@ mcp-transform-ui/.env.local
 mcp-transform-ui/.env.development.local
 mcp-transform-ui/.env.test.local
 mcp-transform-ui/.env.production.local
-mcp-transform-ui/package-lock.json
 
 # ------------------------------
 # Pytest
@@ -69,6 +68,8 @@ htmlcov/
 # Ruff / Lint cache
 # ------------------------------
 .ruff_cache/
+.python-version
+pip-wheel-metadata/
 
 # ------------------------------
 # IDE settings

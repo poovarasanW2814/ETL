@@ -9,6 +9,7 @@ from app.agents.format_resolver import (
     resolve_alias,
 )
 from app.agents.prompt_analyzer import analyze_prompt_plan
+from app.infrastructure.cache.prompt_plan_cache import get_prompt_plan, store_prompt_plan
 from app.logging.logger import logger
 from app.services.transform_service import tool_detect_source_format
 
@@ -57,8 +58,30 @@ def resolve_transformation_plan(
                     "confidence": 0.98,
                 }
 
+    cached_plan = get_prompt_plan(normalized_prompt)
+    if cached_plan is not None and isinstance(cached_plan.get("target_format"), str):
+        source_format_hint = tool_detect_source_format(values or [])
+        plan = {
+            "target_format": cached_plan.get("target_format"),
+            "source_format_hint": source_format_hint,
+            "timezone_strategy": "strip"
+            if isinstance(cached_plan.get("target_format"), str)
+            and ("HH" in str(cached_plan.get("target_format")) or "Z" in str(cached_plan.get("target_format")))
+            else "none",
+            "confidence": cached_plan.get("confidence", 0.0),
+        }
+        logger.info(
+            "Resolved transformation plan from prompt cache",
+            target_format=plan["target_format"],
+            source_format_hint=plan["source_format_hint"],
+            timezone_strategy=plan["timezone_strategy"],
+            confidence=plan["confidence"],
+        )
+        return plan
+
     ai_plan = analyze_prompt_plan(normalized_prompt)
     if ai_plan is not None:
+        store_prompt_plan(normalized_prompt, ai_plan)
         source_format_hint = tool_detect_source_format(values or [])
         plan = {
             "target_format": ai_plan.get("target_format"),
