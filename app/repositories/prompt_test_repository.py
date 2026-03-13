@@ -37,6 +37,9 @@ async def create_prompt_test_session(
     values: list[str | None],
     detected_format: str,
     target_format: str | None,
+    source_format_hint: str | None = None,
+    timezone_strategy: str | None = None,
+    confidence: float | None = None,
     transformed_values: list[str | None],
 ) -> None:
     """Persist a prompt playground execution in the prompt-lab database."""
@@ -52,6 +55,9 @@ async def create_prompt_test_session(
             "values": values,
             "detected_format": detected_format,
             "target_format": target_format,
+            "source_format_hint": source_format_hint,
+            "timezone_strategy": timezone_strategy,
+            "confidence": confidence,
             "transformed_values": transformed_values,
             "created_at": datetime.utcnow(),
         }

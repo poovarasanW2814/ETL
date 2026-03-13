@@ -110,6 +110,18 @@ class PromptInsightResponse(BaseModel):
     prompt: str = Field(..., description="Original prompt")
     detected_format: str = Field(..., description="Detected source format hint")
     target_format: str | None = Field(default=None, description="Resolved target format")
+    source_format_hint: str | None = Field(
+        default=None,
+        description="Agent-selected source format hint",
+    )
+    timezone_strategy: str | None = Field(
+        default=None,
+        description="Agent-selected timezone strategy",
+    )
+    confidence: float | None = Field(
+        default=None,
+        description="Agent confidence score for the plan",
+    )
 
 
 class JobSummaryResponse(BaseModel):
@@ -250,6 +262,18 @@ class PromptTestResponse(BaseModel):
     prompt: str = Field(..., description="Prompt under test")
     detected_format: str = Field(..., description="Detected source format hint")
     target_format: str | None = Field(default=None, description="Resolved target format")
+    source_format_hint: str | None = Field(
+        default=None,
+        description="Agent-selected source format hint",
+    )
+    timezone_strategy: str | None = Field(
+        default=None,
+        description="Agent-selected timezone strategy",
+    )
+    confidence: float | None = Field(
+        default=None,
+        description="Agent confidence score",
+    )
     transformed_values: list[str | None] = Field(
         ...,
         description="Preview transformation output for the supplied input values",

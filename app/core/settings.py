@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     mongo_database_name: str = Field(default="mcp_transform_service")
     mongo_prompt_lab_database_name: str = Field(default="mcp_prompt_lab")
     prompt_test_ttl_seconds: int = Field(default=7 * 24 * 60 * 60)
+    ai_provider: str = Field(default="ollama")
+    ai_primary_model: str = Field(default="qwen2.5:7b")
+    ai_fallback_model: str = Field(default="deepseek-coder:6.7b")
+    ai_timeout_seconds: int = Field(default=90)
+    ollama_base_url: str = Field(default="http://localhost:11434")
 
     model_config = SettingsConfigDict(
         env_file=".env",

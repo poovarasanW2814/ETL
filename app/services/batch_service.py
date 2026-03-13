@@ -11,6 +11,7 @@ def process_batch(
     columns: list[DateColumnRequest],
     resolved_formats: dict[str, str | None],
     on_column_processed=None,
+    transform_tool=transform_column,
 ) -> dict[str, list[dict[str, list[str | None] | str]]]:
     """Transform all requested columns and build the batch response."""
 
@@ -27,7 +28,7 @@ def process_batch(
         )
 
         transformed_values = (
-            transform_column(column.values, target_format)
+            transform_tool(column.values, target_format)
             if target_format is not None
             else [None for _ in column.values]
         )

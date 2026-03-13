@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from app.infrastructure.cache.retry_cache import delete_retry_payload, get_retry_payload, store_retry_payload
 from app.infrastructure.messaging.job_events import publish_job_event
-from app.agents.agent_facade import resolve_target_format
+from app.agents.agent_facade import resolve_transformation_plan
 from app.logging.logger import logger
 from app.repositories.job_repository import (
     count_jobs,
@@ -33,7 +33,7 @@ from app.schemas.response import (
     PromptTestResponse,
     TransformDatesJobResponse,
 )
-from app.services.transform_service import detect_source_format, transform_column
+from app.services.transform_service import tool_detect_source_format, tool_transform_dates
 from app.workers.tasks import transform_dates_task
 
 router = APIRouter(tags=["mcp-jobs"])
@@ -215,10 +215,23 @@ async def get_mcp_job_preview(job_id: str) -> PreviewResponse:
 async def prompt_tester(payload: PromptTestRequest) -> PromptTestResponse:
     """Preview how the MCP service interprets and transforms a prompt."""
 
-    target_format = resolve_target_format(payload.prompt)
-    detected_format = detect_source_format(payload.values)
+    plan = resolve_transformation_plan(payload.prompt, payload.values)
+    target_format = plan.get("target_format") if isinstance(plan.get("target_format"), str) else None
+    if target_format is None:
+        logger.warning(
+            "Prompt tester could not resolve target date format",
+            source_column=payload.source_column,
+            target_column=payload.target_column,
+            prompt=payload.prompt,
+            number_of_values=len(payload.values),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Unable to resolve target date format from prompt",
+        )
+    detected_format = tool_detect_source_format(payload.values)
     transformed_values = (
-        transform_column(payload.values, target_format)
+        tool_transform_dates(payload.values, target_format)
         if target_format is not None
         else [None for _ in payload.values]
     )
@@ -239,6 +252,9 @@ async def prompt_tester(payload: PromptTestRequest) -> PromptTestResponse:
         values=payload.values,
         detected_format=detected_format,
         target_format=target_format,
+        source_format_hint=plan.get("source_format_hint"),
+        timezone_strategy=plan.get("timezone_strategy"),
+        confidence=plan.get("confidence"),
         transformed_values=transformed_values,
     )
 
@@ -248,6 +264,9 @@ async def prompt_tester(payload: PromptTestRequest) -> PromptTestResponse:
         prompt=payload.prompt,
         detected_format=detected_format,
         target_format=target_format,
+        source_format_hint=plan.get("source_format_hint"),
+        timezone_strategy=plan.get("timezone_strategy"),
+        confidence=plan.get("confidence"),
         transformed_values=transformed_values,
     )
 

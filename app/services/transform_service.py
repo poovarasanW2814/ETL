@@ -41,6 +41,30 @@ def detect_source_format(values: list[str | None]) -> str:
     return "AUTO"
 
 
+def tool_detect_source_format(values: list[str | None]) -> str:
+    """Tool wrapper used by the agent flow to infer a source format hint."""
+
+    return detect_source_format(values)
+
+
+def tool_transform_dates(
+    values: list[str | None],
+    target_format: str,
+) -> list[str | None]:
+    """Tool wrapper used by the agent flow to transform date values."""
+
+    return transform_column(values, target_format)
+
+
+def tool_validate_output(
+    input_values: list[str | None],
+    output_values: list[str | None],
+) -> bool:
+    """Tool wrapper used by the agent flow to validate transformation output."""
+
+    return len(input_values) == len(output_values)
+
+
 def transform_column(
     values: list[str | None],
     target_format: str,

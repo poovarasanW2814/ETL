@@ -5,22 +5,30 @@ from collections.abc import Awaitable, Callable
 from fastapi import FastAPI
 import requests
 
+from app.core.settings import settings
 from app.logging.logger import configure_logger, logger
-
-OLLAMA_BASE_URL = "http://localhost:11434"
 
 
 def check_ollama_availability() -> bool:
     """Check whether the Ollama server is reachable."""
 
+    if settings.ai_provider.lower() != "ollama":
+        logger.info("Skipping Ollama availability check", ai_provider=settings.ai_provider)
+        return True
+
     try:
-        response = requests.get(OLLAMA_BASE_URL, timeout=3)
+        response = requests.get(settings.ollama_base_url, timeout=3)
         response.raise_for_status()
     except requests.RequestException:
-        logger.warning("Ollama server not reachable", ollama_url=OLLAMA_BASE_URL)
+        logger.warning("Ollama server not reachable", ollama_url=settings.ollama_base_url)
         return False
 
-    logger.info("Ollama server detected at http://localhost:11434")
+    logger.info(
+        "Ollama server detected",
+        ollama_url=settings.ollama_base_url,
+        ai_primary_model=settings.ai_primary_model,
+        ai_fallback_model=settings.ai_fallback_model,
+    )
     return True
 
 

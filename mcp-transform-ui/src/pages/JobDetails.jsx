@@ -105,6 +105,10 @@ function JobDetails() {
           return;
         }
 
+        if (payload.event_type !== "job_updated") {
+          return;
+        }
+
         setStatusData((currentStatus) => ({
           ...(currentStatus ?? {}),
           ...payload,
@@ -118,23 +122,11 @@ function JobDetails() {
 
         if (payload.status === "SUCCESS" || payload.status === "FAILED") {
           try {
-            const [details, status, logData, failedData, previewData] = await Promise.all([
-              getJobDetails(jobId),
-              getJobStatus(jobId),
-              getJobLogs(jobId),
-              getFailedRecords(jobId),
-              getPreview(jobId),
-            ]);
+            await loadDetails();
 
             if (isUnmounted) {
               return;
             }
-
-            setJob(details);
-            setStatusData(status);
-            setLogs(logData.logs ?? []);
-            setFailedRecords(failedData.records ?? []);
-            setPreview(previewData.columns ?? []);
           } catch {
             if (!isUnmounted) {
               setError("Unable to refresh final job state.");
@@ -163,7 +155,7 @@ function JobDetails() {
         socket.close();
       }
     };
-  }, [jobId, navigate]);
+  }, [jobId, loadDetails, navigate]);
 
   const mergedJob = {
     ...(job ?? {}),

@@ -21,8 +21,14 @@ function PromptTester() {
       });
       setResult(response);
     } catch (requestError) {
+      const isTimeout =
+        requestError.code === "ECONNABORTED" ||
+        String(requestError.message || "").toLowerCase().includes("timeout");
       setError(
-        requestError.response?.data?.detail ?? "Unable to test the supplied prompt.",
+        requestError.response?.data?.detail ??
+          (isTimeout
+            ? "Prompt testing is taking longer than the current client timeout."
+            : "Unable to test the supplied prompt."),
       );
       setResult(null);
     } finally {
@@ -86,7 +92,17 @@ function PromptTester() {
             </div>
           ) : null}
 
-          {result ? (
+          {loading ? (
+            <div className="mt-5 flex min-h-[280px] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-slate-50/80 px-6 py-10 text-center dark:border-slate-700 dark:bg-slate-900/60">
+              <div className="h-12 w-12 animate-spin rounded-full border-4 border-slate-200 border-t-amber-500 dark:border-slate-700 dark:border-t-amber-400" />
+              <p className="mt-5 text-sm font-semibold text-ink dark:text-slate-100">
+                Running prompt test
+              </p>
+              <p className="mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">
+                The AI planner is analyzing the prompt and preparing the transformation preview.
+              </p>
+            </div>
+          ) : result ? (
             <div className="mt-5 space-y-5">
               <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/70">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">

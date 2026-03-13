@@ -6,7 +6,7 @@ import time
 from datetime import datetime
 from typing import Any
 
-from app.agents.agent_facade import resolve_target_format
+from app.agents.agent_facade import resolve_transformation_plan
 from app.infrastructure.database.mongo import run_async_in_worker_loop
 from app.infrastructure.messaging.celery_app import celery
 from app.infrastructure.messaging.job_events import publish_job_event
@@ -21,7 +21,7 @@ from app.repositories.job_repository import (
 )
 from app.schemas.request import DateColumnRequest, TransformDatesRequest
 from app.services.batch_service import process_batch
-from app.services.transform_service import detect_source_format
+from app.services.transform_service import tool_detect_source_format, tool_transform_dates, tool_validate_output
 from app.workers.queues import TRANSFORM_DATES_QUEUE
 
 FAILED_RECORD_LIMIT = 500
@@ -106,8 +106,16 @@ def transform_dates_task(
 
         for column in request.columns:
             persist_log("INFO", f"Analyzing prompt for column {column.source_column}")
-            target_format = resolve_target_format(column.prompt)
-            detected_format = detect_source_format(column.values)
+            plan = resolve_transformation_plan(column.prompt, column.values)
+            target_format = plan.get("target_format") if isinstance(plan.get("target_format"), str) else None
+            if target_format is None:
+                message = (
+                    f"Unable to resolve target date format from prompt for column "
+                    f"{column.source_column}"
+                )
+                persist_log("ERROR", message)
+                raise ValueError(message)
+            detected_format = tool_detect_source_format(column.values)
             resolved_formats[column.target_column] = target_format
             prompt_insights.append(
                 {
@@ -116,6 +124,9 @@ def transform_dates_task(
                     "prompt": column.prompt,
                     "detected_format": detected_format,
                     "target_format": target_format,
+                    "source_format_hint": plan.get("source_format_hint"),
+                    "timezone_strategy": plan.get("timezone_strategy"),
+                    "confidence": plan.get("confidence"),
                 }
             )
             persist_log(
@@ -181,6 +192,10 @@ def transform_dates_task(
                 "INFO",
                 f"Transforming {len(column.values)} rows for {column.source_column}",
             )
+            if not tool_validate_output(column.values, transformed_values):
+                raise ValueError(
+                    f"Output row count mismatch for column {column.source_column}",
+                )
             run_async_in_worker_loop(
                 update_job_progress(
                     self.request.id,
@@ -215,6 +230,7 @@ def transform_dates_task(
             request.columns,
             resolved_formats,
             on_column_processed=on_column_processed,
+            transform_tool=tool_transform_dates,
         )
         execution_time = round(time.perf_counter() - started_at, 6)
         run_async_in_worker_loop(

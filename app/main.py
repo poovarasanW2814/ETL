@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+import asyncio
 
 from fastapi import FastAPI, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -82,8 +83,20 @@ def create_app() -> FastAPI:
                 await websocket.send_json(event)
         except WebSocketDisconnect:
             logger.info("WebSocket client disconnected", job_id=job_id_filter)
-        except Exception:
-            logger.exception("WebSocket job stream failed", job_id=job_id_filter)
+        except asyncio.CancelledError:
+            logger.info("WebSocket job stream cancelled", job_id=job_id_filter)
+        except Exception as exc:
+            message = str(exc).lower()
+            if (
+                "disconnect" in message
+                or "closed" in message
+                or "close" in message
+                or "cancelled" in message
+                or "1000" in message
+            ):
+                logger.info("WebSocket client disconnected", job_id=job_id_filter)
+            else:
+                logger.exception("WebSocket job stream failed", job_id=job_id_filter)
 
     return application
 

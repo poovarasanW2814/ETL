@@ -5,6 +5,11 @@ const client = axios.create({
   timeout: 30000,
 });
 
+const promptTesterClient = axios.create({
+  baseURL: "http://localhost:8000",
+  timeout: 240000,
+});
+
 export function getJobEventsWebSocketUrl(jobId) {
   const baseUrl = new URL(client.defaults.baseURL);
   baseUrl.protocol = baseUrl.protocol === "https:" ? "wss:" : "ws:";
@@ -39,7 +44,7 @@ export async function getJobAnalytics(params = {}) {
 }
 
 export async function testPrompt(payload) {
-  const { data } = await client.post("/api/v1/prompt-tester", payload);
+  const { data } = await promptTesterClient.post("/api/v1/prompt-tester", payload);
   return data;
 }
 
