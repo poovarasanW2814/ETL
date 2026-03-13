@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     api_version: str = Field(default="1.0.0")
     log_level: str = Field(default="INFO")
     redis_url: str = Field(default="redis://localhost:6379/0")
-    mongo_uri: str = Field(default="mongodb://localhost:27017")
+    mongo_uri: str
     mongo_database_name: str = Field(default="mcp_transform_service")
     mongo_prompt_lab_database_name: str = Field(default="mcp_prompt_lab")
     prompt_test_ttl_seconds: int = Field(default=7 * 24 * 60 * 60)
