@@ -3,8 +3,10 @@
 from collections.abc import Awaitable, Callable
 
 from fastapi import FastAPI
+from pymongo.errors import PyMongoError
 
 from app.core.settings import settings
+from app.infrastructure.database.mongo import ping_mongo
 from app.logging.logger import configure_logger, logger
 
 
@@ -24,6 +26,22 @@ async def on_startup() -> None:
 
     configure_logger()
     check_ollama_availability()
+    try:
+        await ping_mongo()
+        logger.info(
+            "MongoDB connection established",
+            database=settings.mongo_database_name,
+            prompt_lab_database=settings.mongo_prompt_lab_database_name,
+        )
+    except PyMongoError:
+        logger.exception(
+            "MongoDB connection failed during startup",
+            database=settings.mongo_database_name,
+            prompt_lab_database=settings.mongo_prompt_lab_database_name,
+            mongo_required_on_startup=settings.mongo_required_on_startup,
+        )
+        if settings.mongo_required_on_startup:
+            raise
     logger.info("MCP service started")
 
 

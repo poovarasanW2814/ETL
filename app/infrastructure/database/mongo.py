@@ -23,7 +23,10 @@ def get_database() -> AsyncIOMotorDatabase:
     global _mongo_client
 
     if _mongo_client is None:
-        _mongo_client = AsyncIOMotorClient(settings.mongo_uri)
+        _mongo_client = AsyncIOMotorClient(
+            settings.mongo_uri,
+            serverSelectionTimeoutMS=settings.mongo_server_selection_timeout_ms,
+        )
 
     return _mongo_client[settings.mongo_database_name]
 
@@ -34,9 +37,26 @@ def get_prompt_lab_database() -> AsyncIOMotorDatabase:
     global _mongo_client
 
     if _mongo_client is None:
-        _mongo_client = AsyncIOMotorClient(settings.mongo_uri)
+        _mongo_client = AsyncIOMotorClient(
+            settings.mongo_uri,
+            serverSelectionTimeoutMS=settings.mongo_server_selection_timeout_ms,
+        )
 
     return _mongo_client[settings.mongo_prompt_lab_database_name]
+
+
+async def ping_mongo() -> None:
+    """Verify that the configured MongoDB connection is reachable."""
+
+    global _mongo_client
+
+    if _mongo_client is None:
+        _mongo_client = AsyncIOMotorClient(
+            settings.mongo_uri,
+            serverSelectionTimeoutMS=settings.mongo_server_selection_timeout_ms,
+        )
+
+    await _mongo_client.admin.command("ping")
 
 
 def _start_worker_loop(loop: asyncio.AbstractEventLoop) -> None:

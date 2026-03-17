@@ -8,7 +8,7 @@ This project has:
 - Celery worker
 - Redis
 - MongoDB
-- React frontend
+- Angular frontend
 - Gemini integration for AI prompt resolution
 
 All of these are needed for the full project flow.
@@ -24,11 +24,11 @@ All of these are needed for the full project flow.
 - Gemini API
 
 ### Frontend
-- React
-- Vite
+- Angular
+- Angular CLI
 - Tailwind CSS
 - Axios
-- React Router
+- Angular Router
 
 ## Required Software
 The developer needs to install these first.
@@ -119,7 +119,7 @@ Example command:
 Copy-Item .env.example .env
 ```
 
-Then update `.env` with a real Gemini key.
+Then update `.env` if you need different environment-specific values.
 
 ## Step 5. Required `.env` Values
 The `.env` file should contain values like this:
@@ -131,7 +131,7 @@ GEMINI_MODEL=gemini-2.5-flash
 GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta
 PROMPT_PLAN_CACHE_TTL_SECONDS=2592000
 REDIS_URL=redis://localhost:6379/0
-MONGO_URI=mongodb://localhost:27017
+MONGO_URI=mongodb+srv://poovarasangandhi:king%407143@cluster0.o0tbm9b.mongodb.net/
 MONGO_DATABASE_NAME=mcp_transform_service
 MONGO_PROMPT_LAB_DATABASE_NAME=mcp_prompt_lab
 PROMPT_TEST_TTL_SECONDS=604800
@@ -156,7 +156,7 @@ How to start Redis depends on the machine setup.
 MongoDB must be running before the backend is used.
 
 Expected address:
-- `mongodb://localhost:27017`
+- `mongodb+srv://poovarasangandhi:king%407143@cluster0.o0tbm9b.mongodb.net/`
 
 How to start MongoDB depends on the machine setup.
 
@@ -222,7 +222,7 @@ For the full project to work, these must be running:
 2. MongoDB
 3. FastAPI backend
 4. Celery worker
-5. React frontend
+5. Angular frontend
 
 If one of these is missing, part of the project will fail.
 
@@ -239,7 +239,7 @@ If this works, FastAPI is running.
 Open:
 - `http://localhost:5173`
 
-If this works, React frontend is running.
+If this works, Angular frontend is running.
 
 ### 3. Prompt tester works
 Try a simple prompt through frontend or Swagger.

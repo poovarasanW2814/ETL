@@ -7,6 +7,7 @@ import asyncio
 
 from fastapi import FastAPI, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from redis.exceptions import RedisError
 
 from app.api.router import api_router
 from app.core.constants import (
@@ -31,7 +32,10 @@ def create_app() -> FastAPI:
 
     application.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173"],
+        allow_origins=[
+            "http://localhost:4200",
+            "http://localhost:5173",
+        ],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -85,6 +89,8 @@ def create_app() -> FastAPI:
             logger.info("WebSocket client disconnected", job_id=job_id_filter)
         except asyncio.CancelledError:
             logger.info("WebSocket job stream cancelled", job_id=job_id_filter)
+        except RedisError:
+            logger.warning("WebSocket job stream unavailable because Redis is unreachable", job_id=job_id_filter)
         except Exception as exc:
             message = str(exc).lower()
             if (

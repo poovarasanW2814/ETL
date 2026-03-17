@@ -8,6 +8,9 @@ celery
 redis
 flower
 
+motor
+pymongo
+
 pandas
 numpy
 python-dateutil
