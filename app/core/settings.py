@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Runtime settings loaded from environment variables."""
 
-    app_name: str = Field(default="MCP Data Transform Service")
+    app_name: str = Field(default="DTS")
     api_version: str = Field(default="1.0.0")
     log_level: str = Field(default="INFO")
     redis_url: str = Field(default="redis://localhost:6379/0")

@@ -13,12 +13,10 @@ const THEME_STORAGE_KEY = 'mcp-transform-ui-theme';
       <header class="sticky top-0 z-20 border-b border-slate-200/80 bg-white/75 backdrop-blur transition-colors duration-300 dark:border-slate-800 dark:bg-slate-950/75">
         <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
           <a routerLink="/" class="flex items-center gap-3">
-            <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-ink text-sm font-extrabold uppercase tracking-[0.2em] text-white dark:bg-amber-500 dark:text-slate-950">
-              MCP
-            </div>
+            
             <div>
               <p class="text-xs font-semibold uppercase tracking-[0.35em] text-amber-600 dark:text-amber-400">ETL Monitoring</p>
-              <h1 class="text-lg font-extrabold text-ink dark:text-slate-100 sm:text-xl">MCP Data Transform Service</h1>
+              <h1 class="text-lg font-extrabold text-ink dark:text-slate-100 sm:text-xl">DATA TRANSFORM SERVICE</h1>
             </div>
           </a>
 

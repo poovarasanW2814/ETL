@@ -8,10 +8,24 @@ services:
     networks:
       - mcp-network
 
+  api:
+    build:
+      context: .
+      dockerfile: deployments/docker/Dockerfile.api
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+    networks:
+      - mcp-network
+
   worker:
     build:
       context: .
       dockerfile: deployments/docker/Dockerfile.worker
+    command: celery -A app.infrastructure.messaging.celery_app worker -Q transform_dates --loglevel=info
     environment:
       - REDIS_URL=redis://redis:6379/0
     depends_on:

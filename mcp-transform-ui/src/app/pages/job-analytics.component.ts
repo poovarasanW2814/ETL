@@ -1,9 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import Chart from 'chart.js/auto';
 
 import { McpApiService } from '../core/mcp-api.service';
-import { AnalyticsResponse, DurationBreakdownItem } from '../models';
+import { AnalyticsResponse } from '../models';
 import { JobTableComponent } from '../shared/job-table.component';
 import { LoaderComponent } from '../shared/loader.component';
 
@@ -89,47 +90,28 @@ import { LoaderComponent } from '../shared/loader.component';
 
       <ng-container *ngIf="!loading && !error && analytics">
         <div class="grid gap-6 xl:grid-cols-2">
+          <!-- Status Distribution Pie Chart -->
           <div class="glass-panel px-6 py-6">
             <h3 class="text-lg font-extrabold text-ink dark:text-slate-100">Status distribution</h3>
-            <div class="mt-6 space-y-4">
-              <div *ngFor="let item of analytics.status_breakdown" class="space-y-2">
-                <div class="flex items-center justify-between text-sm font-semibold text-slate-600 dark:text-slate-300">
-                  <span>{{ item.status }}</span>
-                  <span>{{ item.count }}</span>
-                </div>
-                <div class="h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-                  <div class="chart-bar" [style.width.%]="ratio(item.count, maxStatusCount)"></div>
-                </div>
-              </div>
+            <div class="mt-6 flex justify-center">
+              <canvas #statusChart style="max-width: 300px; max-height: 300px;"></canvas>
             </div>
           </div>
 
+          <!-- Average Duration Bar Chart -->
           <div class="glass-panel px-6 py-6">
             <h3 class="text-lg font-extrabold text-ink dark:text-slate-100">Average duration by pipeline</h3>
-            <div class="mt-6 space-y-4">
-              <div *ngFor="let item of topDurations" class="space-y-2">
-                <div class="flex items-center justify-between text-sm font-semibold text-slate-600 dark:text-slate-300">
-                  <span class="truncate pr-4">{{ item.pipeline_id }}</span>
-                  <span>{{ item.average_duration | number : '1.0-2' }}s</span>
-                </div>
-                <div class="h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-                  <div class="chart-bar" [style.width.%]="ratio(item.average_duration, maxDuration)"></div>
-                </div>
-              </div>
+            <div class="mt-6">
+              <canvas #durationChart style="max-height: 350px;"></canvas>
             </div>
           </div>
         </div>
 
+        <!-- Job Volume Timeline Bar Chart -->
         <div class="glass-panel px-6 py-6">
           <h3 class="text-lg font-extrabold text-ink dark:text-slate-100">Job volume over time</h3>
-          <div class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div *ngFor="let item of analytics.timeline" class="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-              <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">{{ item.date }}</p>
-              <p class="mt-3 text-2xl font-extrabold text-ink dark:text-slate-100">{{ item.job_count }}</p>
-              <div class="mt-3 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-                <div class="chart-bar" [style.width.%]="ratio(item.job_count, maxTimelineCount)"></div>
-              </div>
-            </div>
+          <div class="mt-6">
+            <canvas #timelineChart style="max-height: 350px;"></canvas>
           </div>
         </div>
 
@@ -158,7 +140,11 @@ import { LoaderComponent } from '../shared/loader.component';
     </section>
   `,
 })
-export class JobAnalyticsComponent implements OnInit {
+export class JobAnalyticsComponent implements OnInit, OnDestroy {
+  @ViewChild('statusChart') statusChartRef!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('durationChart') durationChartRef!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('timelineChart') timelineChartRef!: ElementRef<HTMLCanvasElement>;
+
   readonly api = inject(McpApiService);
   readonly durationOptions = [
     { label: 'Today', value: 'today' },
@@ -178,28 +164,20 @@ export class JobAnalyticsComponent implements OnInit {
   error = '';
   analytics: AnalyticsResponse | null = null;
 
+  private statusChartInstance: Chart | null = null;
+  private durationChartInstance: Chart | null = null;
+  private timelineChartInstance: Chart | null = null;
+
   get totalPages(): number {
     return this.analytics ? Math.max(Math.ceil(this.analytics.total / this.limit), 1) : 1;
   }
 
-  get topDurations(): DurationBreakdownItem[] {
-    return this.analytics?.duration_breakdown.slice(0, 8) ?? [];
-  }
-
-  get maxStatusCount(): number {
-    return Math.max(...(this.analytics?.status_breakdown.map((item) => item.count) ?? [1]));
-  }
-
-  get maxDuration(): number {
-    return Math.max(...this.topDurations.map((item) => item.average_duration), 1);
-  }
-
-  get maxTimelineCount(): number {
-    return Math.max(...(this.analytics?.timeline.map((item) => item.job_count) ?? [1]));
-  }
-
   ngOnInit(): void {
     void this.loadAnalytics();
+  }
+
+  ngOnDestroy(): void {
+    this.destroyCharts();
   }
 
   selectDuration(duration: string): void {
@@ -219,10 +197,6 @@ export class JobAnalyticsComponent implements OnInit {
     void this.loadAnalytics();
   }
 
-  ratio(value: number, maxValue: number): number {
-    return maxValue > 0 ? Math.max(8, (value / maxValue) * 100) : 0;
-  }
-
   private async loadAnalytics(): Promise<void> {
     try {
       const params: Record<string, string | number | undefined> = { page: this.page, limit: this.limit };
@@ -235,6 +209,12 @@ export class JobAnalyticsComponent implements OnInit {
 
       this.analytics = await this.api.getJobAnalytics(params);
       this.error = '';
+
+      // Initialize charts after a short delay to ensure DOM is ready
+      setTimeout(() => {
+        this.destroyCharts();
+        this.initializeCharts();
+      }, 0);
     } catch (error: unknown) {
       this.error = this.resolveError(error, 'Unable to load job analytics.');
     } finally {
@@ -249,5 +229,163 @@ export class JobAnalyticsComponent implements OnInit {
     }
 
     return fallback;
+  }
+
+  private destroyCharts(): void {
+    this.statusChartInstance?.destroy();
+    this.durationChartInstance?.destroy();
+    this.timelineChartInstance?.destroy();
+    this.statusChartInstance = null;
+    this.durationChartInstance = null;
+    this.timelineChartInstance = null;
+  }
+
+  private initializeCharts(): void {
+    if (!this.analytics) return;
+
+    this.createStatusChart();
+    this.createDurationChart();
+    this.createTimelineChart();
+  }
+
+  private createStatusChart(): void {
+    if (!this.statusChartRef?.nativeElement || !this.analytics) return;
+
+    const ctx = this.statusChartRef.nativeElement.getContext('2d');
+    if (!ctx) return;
+
+    const colors = ['#10b981', '#8b5cf6', '#ef4444'];
+    this.statusChartInstance = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: this.analytics.status_breakdown.map((item) => item.status),
+        datasets: [
+          {
+            data: this.analytics.status_breakdown.map((item) => item.count),
+            backgroundColor: colors,
+            borderColor: ['#ffffff', '#ffffff', '#ffffff'],
+            borderWidth: 2,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              padding: 20,
+              color: '#64748b',
+              font: { size: 12, weight: 'bold' },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  private createDurationChart(): void {
+    if (!this.durationChartRef?.nativeElement || !this.analytics) return;
+
+    const ctx = this.durationChartRef.nativeElement.getContext('2d');
+    if (!ctx) return;
+
+    const topDurations = this.analytics.duration_breakdown.slice(0, 8);
+
+    this.durationChartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: topDurations.map((item) => item.pipeline_id),
+        datasets: [
+          {
+            label: 'Average Duration (seconds)',
+            data: topDurations.map((item) => item.average_duration),
+            backgroundColor: '#f59e0b',
+            borderRadius: 6,
+            borderSkipped: false,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false,
+          },
+        },
+        scales: {
+          x: {
+            grid: {
+              display: false,
+            },
+            ticks: {
+              color: '#64748b',
+            },
+          },
+          y: {
+            beginAtZero: true,
+            grid: {
+              color: '#e2e8f0',
+            },
+            ticks: {
+              color: '#64748b',
+            },
+          },
+        },
+      },
+    });
+  }
+
+  private createTimelineChart(): void {
+    if (!this.timelineChartRef?.nativeElement || !this.analytics) return;
+
+    const ctx = this.timelineChartRef.nativeElement.getContext('2d');
+    if (!ctx) return;
+
+    this.timelineChartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: this.analytics.timeline.map((item) => item.date),
+        datasets: [
+          {
+            label: 'Job Count',
+            data: this.analytics.timeline.map((item) => item.job_count),
+            backgroundColor: '#1e293b',
+            borderRadius: 6,
+            borderSkipped: false,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false,
+          },
+        },
+        scales: {
+          x: {
+            grid: {
+              color: '#e2e8f0',
+            },
+            ticks: {
+              color: '#64748b',
+            },
+          },
+          y: {
+            beginAtZero: true,
+            grid: {
+              color: '#e2e8f0',
+            },
+            ticks: {
+              color: '#64748b',
+            },
+          },
+        },
+      },
+    });
   }
 }
