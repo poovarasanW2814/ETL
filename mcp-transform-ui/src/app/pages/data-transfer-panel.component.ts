@@ -168,7 +168,7 @@ interface ParsedData {
           <div class="mt-4">
             <button
               (click)="startTransformation()"
-              [disabled]="isTransforming() || columnsFormArray.value.filter((c: any) => c.selected).length === 0"
+              [disabled]="isTransforming() || !hasSelectedColumns()"
               class="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
             >
               {{ isTransforming() ? 'Processing...' : 'Confirm Selection' }}
@@ -214,6 +214,55 @@ interface ParsedData {
           </table>
         </div>
       </div>
+
+      <!-- Transformed Data Preview -->
+      <div *ngIf="transformedData()" class="glass-panel px-6 py-8">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h3 class="text-lg font-extrabold text-ink dark:text-slate-100">Transformed Data</h3>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              Showing first {{ Math.min(10, transformedData()!.rows.length) }} of {{ transformedData()!.rows.length }} rows
+            </p>
+          </div>
+
+          <button
+            type="button"
+            (click)="downloadTransformedDataAsExcel()"
+            class="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600"
+          >
+            Download Excel
+          </button>
+        </div>
+
+        <div class="mt-4 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900">
+                <th class="px-4 py-3 text-left font-semibold text-slate-700 dark:text-slate-300">#</th>
+                <th
+                  *ngFor="let column of transformedData()!.columns"
+                  class="px-4 py-3 text-left font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap"
+                >
+                  {{ column }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                *ngFor="let row of transformedData()!.rows.slice(0, 10); let i = index"
+                class="border-b border-slate-100 transition hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/50"
+              >
+                <td class="px-4 py-3 text-slate-500 dark:text-slate-400">{{ i + 1 }}</td>
+                <td
+                  *ngFor="let cell of row"
+                  class="px-4 py-3 text-slate-700 dark:text-slate-300 truncate max-w-xs"
+                >
+                  {{ cell }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Loading State -->
@@ -240,34 +289,40 @@ interface ParsedData {
         </div>
       </div>
 
-      <!-- Start Transformation Button -->
-      <div *ngIf="parsedData() && columnsFormArray.length > 0" class="glass-panel px-6 py-8">
-        <button
-          (click)="startTransformation()"
-          [disabled]="isTransforming()"
-          class="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
-        >
-          {{ isTransforming() ? 'Processing...' : 'Select Columns' }}
-        </button>
-      </div>
-
-      <!-- Transformation Results Section -->
-      <div *ngIf="selectedColumnsForDisplay().length > 0 && transformedDateColumns().length > 0" class="glass-panel px-6 py-8">
-        <h3 class="text-lg font-extrabold text-ink dark:text-slate-100">Transformation Results</h3>
+      <!-- Database Upload Section -->
+      <div *ngIf="showDatabaseSection()" class="glass-panel px-6 py-8">
+        <h3 class="text-lg font-extrabold text-ink dark:text-slate-100">Upload To Database</h3>
         <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-          Selected Columns: {{ selectedColumnsForDisplay().join(', ') }}
+          Choose the transformed fields you want to send to the database.
         </p>
-        <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
-          Transformed Date Columns: {{ getTransformedColumnsDisplay() }}
-        </p>
-      </div>
 
-      <!-- Selected Columns Display (no transformation) -->
-      <div *ngIf="selectedColumnsForDisplay().length > 0 && transformedDateColumns().length === 0" class="glass-panel px-6 py-8">
-        <h3 class="text-lg font-extrabold text-ink dark:text-slate-100">Selected Columns</h3>
-        <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-          Selected: {{ selectedColumnsForDisplay().join(', ') }}
-        </p>
+        <form [formGroup]="transferForm" class="mt-4 space-y-3">
+          <div formArrayName="columns" class="grid gap-3 md:grid-cols-2">
+            <label
+              *ngFor="let column of transferColumnsFormArray.controls; let i = index"
+              [formGroupName]="i"
+              class="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200"
+            >
+              <input
+                type="checkbox"
+                formControlName="selected"
+                class="h-4 w-4 cursor-pointer accent-green-600"
+              />
+              <span>{{ column.get('column_name')!.value }}</span>
+            </label>
+          </div>
+        </form>
+
+        <div class="mt-5">
+          <button
+            type="button"
+            (click)="transferToDatabase()"
+            [disabled]="isTransferingToDb() || !hasTransferColumnsSelected()"
+            class="w-full rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-emerald-500 dark:hover:bg-emerald-600"
+          >
+            {{ isTransferingToDb() ? 'Uploading...' : 'Upload To Database' }}
+          </button>
+        </div>
       </div>
 
       <!-- Error State -->
@@ -294,6 +349,7 @@ export class DataTransferPanelComponent {
   pipelineId = 'default-pipeline';
   batchId = 'default-batch';
   private apiUrl = 'http://127.0.0.1:8000/api/v1/transform-dates';
+  private transformStatusUrl = 'http://127.0.0.1:8000/api/v1/transform-status';
   private dbTransferUrl = 'http://127.0.0.1:8000/api/v1/transfer-to-db';
   selectedColumnsForDisplay = signal<string[]>([]);
   transformedDateColumns = signal<any[]>([]);
@@ -324,6 +380,18 @@ export class DataTransferPanelComponent {
     return this.columnsFormArray.value.filter((col: any) => col.selected && this.isDateColumn(col.source_column));
   }
 
+  hasSelectedColumns(): boolean {
+    return this.columnsFormArray.value.some((col: any) => col.selected);
+  }
+
+  hasTransferColumnsSelected(): boolean {
+    return this.transferColumnsFormArray.value.some((col: any) => col.selected);
+  }
+
+  showDatabaseSection(): boolean {
+    return !!this.transformedData() && this.transferColumnsFormArray.length > 0;
+  }
+
   getDisplayColumns(): string[] {
     if (this.selectedColumnsForDisplay().length === 0) {
       return this.parsedData()?.columns || [];
@@ -344,21 +412,127 @@ export class DataTransferPanelComponent {
       .join(', ');
   }
 
+  private buildPreviewData(data: ParsedData, columnsToKeep: string[]): ParsedData {
+    const columnIndexes = columnsToKeep
+      .map((column) => data.columns.indexOf(column))
+      .filter((index) => index >= 0);
+
+    return {
+      columns: columnIndexes.map((index) => data.columns[index]),
+      rows: data.rows.map((row) => columnIndexes.map((index) => row[index] ?? null))
+    };
+  }
+
+  private buildSelectedData(selectedColumns: any[], currentData: ParsedData): ParsedData {
+    const outputColumns = selectedColumns.map((col: any) => col.source_column);
+    return this.buildPreviewData(currentData, outputColumns);
+  }
+
+  private buildTransformedData(
+    currentData: ParsedData,
+    selectedColumns: any[],
+    transformedColumns: any[]
+  ): ParsedData {
+    const baseData = this.buildSelectedData(selectedColumns, currentData);
+    const rows = baseData.rows.map((row) => [...row]);
+    const columns = [...baseData.columns];
+
+    transformedColumns.forEach((transformedColumn: any) => {
+      const columnIndex = columns.indexOf(transformedColumn.target_column);
+
+      if (columnIndex >= 0) {
+        rows.forEach((row, rowIndex) => {
+          row[columnIndex] = transformedColumn.values[rowIndex] ?? null;
+        });
+        return;
+      }
+
+      columns.push(transformedColumn.target_column);
+      rows.forEach((row, rowIndex) => {
+        row.push(transformedColumn.values[rowIndex] ?? null);
+      });
+    });
+
+    return { columns, rows };
+  }
+
+  private pollTransformationStatus(
+    jobId: string,
+    currentData: ParsedData,
+    selectedColumns: any[],
+    maxAttempts = 40
+  ): void {
+    let attempts = 0;
+
+    const checkStatus = () => {
+      this.http.get<any>(`${this.transformStatusUrl}/${jobId}`).subscribe({
+        next: (statusResponse) => {
+          this.zone.run(() => {
+            if (statusResponse.status === 'SUCCESS' && statusResponse.result?.columns) {
+              const transformedData = this.buildTransformedData(
+                currentData,
+                selectedColumns,
+                statusResponse.result.columns
+              );
+
+              this.transformedData.set(transformedData);
+              this.initializeTransferForm(transformedData.columns);
+              this.isTransforming.set(false);
+              this.error.set(null);
+              return;
+            }
+
+            if (statusResponse.status === 'FAILED') {
+              this.error.set(statusResponse.error || 'Transformation failed');
+              this.isTransforming.set(false);
+              return;
+            }
+
+            attempts += 1;
+            if (attempts >= maxAttempts) {
+              this.error.set('Transformation is taking too long. Please try again.');
+              this.isTransforming.set(false);
+              return;
+            }
+
+            setTimeout(checkStatus, 1500);
+          });
+        },
+        error: (err) => {
+          this.zone.run(() => {
+            this.error.set(`Failed to fetch transformation status: ${err.message || 'Unknown error'}`);
+            this.isTransforming.set(false);
+          });
+        }
+      });
+    };
+
+    checkStatus();
+  }
+
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
       this.uploadedFile.set(input.files[0]);
       this.parsedData.set(null);
+      this.transformedData.set(null);
       this.error.set(null);
+      this.selectedColumnsForDisplay.set([]);
+      this.transformedDateColumns.set([]);
       this.columnsFormArray.clear();
+      this.transferColumnsFormArray.clear();
     }
   }
 
   clearFile(): void {
     this.uploadedFile.set(null);
     this.parsedData.set(null);
+    this.transformedData.set(null);
     this.error.set(null);
+    this.selectedColumnsForDisplay.set([]);
+    this.transformedDateColumns.set([]);
     this.columnsFormArray.clear();
+    this.transferColumnsFormArray.clear();
   }
 
   async processFile(): Promise<void> {
@@ -396,7 +570,11 @@ export class DataTransferPanelComponent {
         console.log('Parsed data:', data);
         this.zone.run(() => {
           this.parsedData.set(data);
+          this.transformedData.set(null);
+          this.selectedColumnsForDisplay.set([]);
+          this.transformedDateColumns.set([]);
           this.initializeColumnForm(data.columns);
+          this.transferColumnsFormArray.clear();
           this.isLoading.set(false);
         });
       }
@@ -520,8 +698,10 @@ export class DataTransferPanelComponent {
     const column = this.columnsFormArray.at(index);
     const isSelected = column.get('selected')?.value;
     const promptControl = column.get('prompt');
+    const sourceColumn = column.get('source_column')?.value;
+    const isDateField = typeof sourceColumn === 'string' && this.isDateColumn(sourceColumn);
     
-    if (isSelected) {
+    if (isSelected && isDateField) {
       promptControl?.setValidators([Validators.required]);
     } else {
       promptControl?.clearValidators();
@@ -552,14 +732,33 @@ export class DataTransferPanelComponent {
 
     const dateColumnsToTransform = selectedColumns.filter((col: any) => this.isDateColumn(col.source_column));
 
+    const invalidDateColumn = dateColumnsToTransform.find((col: any) => !col.prompt?.trim());
+    if (invalidDateColumn) {
+      this.error.set(`Please enter a prompt for ${invalidDateColumn.source_column}`);
+      return;
+    }
+
+    const invalidTargetColumn = dateColumnsToTransform.find((col: any) => col.isNewColumn && !col.target_column?.trim());
+    if (invalidTargetColumn) {
+      this.error.set(`Please enter a new column name for ${invalidTargetColumn.source_column}`);
+      return;
+    }
+
     // Store selected columns for display
-    const selectedColumnNames = selectedColumns.map((col: any) => col.source_column);
-    this.selectedColumnsForDisplay.set(selectedColumnNames);
+    this.selectedColumnsForDisplay.set(selectedColumns.map((col: any) => col.source_column));
     this.transformedDateColumns.set(dateColumnsToTransform);
+
+    const currentData = this.parsedData();
+    if (!currentData) {
+      this.error.set('No data to transform');
+      return;
+    }
 
     // If no date columns, just display the selected columns
     if (dateColumnsToTransform.length === 0) {
-      console.log('No date columns selected, displaying selected columns only');
+      const selectedData = this.buildSelectedData(selectedColumns, currentData);
+      this.transformedData.set(selectedData);
+      this.initializeTransferForm(selectedData.columns);
       this.error.set(null);
       return;
     }
@@ -567,13 +766,6 @@ export class DataTransferPanelComponent {
     // If date columns exist, call the API
     this.isTransforming.set(true);
     this.error.set(null);
-
-    const currentData = this.parsedData();
-    if (!currentData) {
-      this.error.set('No data to transform');
-      this.isTransforming.set(false);
-      return;
-    }
 
     const payload = {
       pipeline_id: this.pipelineId,
@@ -595,32 +787,14 @@ export class DataTransferPanelComponent {
 
     this.http.post<any>(this.apiUrl, payload).subscribe({
       next: (response) => {
-        this.isTransforming.set(false);
         this.zone.run(() => {
-          console.log('Transformation completed:', response);
-          
-          if (response.data && response.data.transformed_rows) {
-            const currentData = this.parsedData();
-            if (currentData) {
-              const newColumns = [...currentData.columns];
-              
-              // Add new transformed columns if they don't exist
-              dateColumnsToTransform.forEach((col: any) => {
-                if (col.isNewColumn && !newColumns.includes(col.target_column)) {
-                  newColumns.push(col.target_column);
-                }
-              });
-
-              // Set transformed data (keep original data unchanged)
-              this.transformedData.set({
-                columns: newColumns,
-                rows: response.data.transformed_rows
-              });
-
-              // Initialize transfer form with transformed columns
-              this.initializeTransferForm(newColumns);
-            }
+          if (!response.job_id) {
+            this.error.set('Transformation job was created without a job id');
+            this.isTransforming.set(false);
+            return;
           }
+
+          this.pollTransformationStatus(response.job_id, currentData, selectedColumns);
         });
       },
       error: (err) => {
@@ -687,5 +861,36 @@ export class DataTransferPanelComponent {
     const sizes = ['Bytes', 'KB', 'MB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+  }
+
+  downloadTransformedDataAsExcel(): void {
+    const transformedDataValue = this.transformedData();
+
+    if (!transformedDataValue) {
+      this.error.set('No transformed data available to download');
+      return;
+    }
+
+    this.error.set(null);
+
+    const worksheetData = [
+      transformedDataValue.columns,
+      ...transformedDataValue.rows
+    ];
+    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+    const workbook = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, this.getWorksheetName());
+    XLSX.writeFile(workbook, this.getDownloadFileName());
+  }
+
+  private getDownloadFileName(): string {
+    const originalName = this.uploadedFile()?.name ?? 'transformed-data';
+    const sanitizedName = originalName.replace(/\.[^.]+$/, '');
+    return `${sanitizedName}-transformed.xlsx`;
+  }
+
+  private getWorksheetName(): string {
+    return 'TransformedData';
   }
 }
