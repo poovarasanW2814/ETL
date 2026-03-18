@@ -101,8 +101,8 @@ import { LoaderComponent } from '../shared/loader.component';
           <!-- Average Duration Bar Chart -->
           <div class="glass-panel px-6 py-6">
             <h3 class="text-lg font-extrabold text-ink dark:text-slate-100">Average duration by pipeline</h3>
-            <div class="mt-6">
-              <canvas #durationChart style="max-height: 350px;"></canvas>
+            <div class="mt-6" [style.height.px]="getDurationChartHeight()">
+              <canvas #durationChart></canvas>
             </div>
           </div>
         </div>
@@ -292,11 +292,12 @@ export class JobAnalyticsComponent implements OnInit, OnDestroy {
     if (!ctx) return;
 
     const topDurations = this.analytics.duration_breakdown.slice(0, 8);
+    const compactView = typeof window !== 'undefined' && window.innerWidth < 768;
 
     this.durationChartInstance = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: topDurations.map((item) => item.pipeline_id),
+        labels: topDurations.map((item) => this.formatPipelineLabel(item.pipeline_id)),
         datasets: [
           {
             label: 'Average Duration (seconds)',
@@ -314,6 +315,14 @@ export class JobAnalyticsComponent implements OnInit, OnDestroy {
           legend: {
             display: false,
           },
+          tooltip: {
+            callbacks: {
+              title: (tooltipItems) => {
+                const item = topDurations[tooltipItems[0]?.dataIndex ?? 0];
+                return item?.pipeline_id ?? '';
+              },
+            },
+          },
         },
         scales: {
           x: {
@@ -322,6 +331,13 @@ export class JobAnalyticsComponent implements OnInit, OnDestroy {
             },
             ticks: {
               color: '#64748b',
+              maxRotation: compactView ? 22 : 0,
+              minRotation: compactView ? 22 : 0,
+              autoSkip: false,
+              font: {
+                size: compactView ? 10 : 12,
+              },
+              padding: 10,
             },
           },
           y: {
@@ -336,6 +352,28 @@ export class JobAnalyticsComponent implements OnInit, OnDestroy {
         },
       },
     });
+  }
+
+  getDurationChartHeight(): number {
+    return typeof window !== 'undefined' && window.innerWidth < 768 ? 360 : 420;
+  }
+
+  private formatPipelineLabel(pipelineId: string): string {
+    const cleaned = pipelineId
+      .replace(/pipeline/gi, '')
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!cleaned) {
+      return 'Default';
+    }
+
+    if (cleaned.length <= 18) {
+      return cleaned;
+    }
+
+    return `${cleaned.slice(0, 18)}...`;
   }
 
   private createTimelineChart(): void {

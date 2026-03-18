@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Subscription } from 'rxjs';
 
 import { McpApiService } from '../core/mcp-api.service';
 import { FailedRecord, JobLog, JobRecord, JobStatusResponse, PreviewColumn, PreviewSample } from '../models';
@@ -23,6 +24,38 @@ import { StatusBadgeComponent } from '../shared/status-badge.component';
 
     <section *ngIf="!loading && !error" class="space-y-6">
       <a routerLink="/" class="inline-flex text-sm font-semibold text-amber-700 hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-300">Back to dashboard</a>
+
+      <div
+        *ngIf="retryLaunch"
+        class="relative overflow-hidden rounded-[2rem] border border-emerald-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_38%),linear-gradient(135deg,_rgba(255,255,255,0.96),_rgba(236,253,245,0.96))] px-6 py-6 shadow-[0_24px_80px_-40px_rgba(16,185,129,0.65)] dark:border-emerald-900/60 dark:bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_38%),linear-gradient(135deg,_rgba(6,78,59,0.78),_rgba(2,44,34,0.92))]"
+      >
+        <div class="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-emerald-300/20 blur-2xl dark:bg-emerald-400/10"></div>
+        <div class="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p class="text-xs font-bold uppercase tracking-[0.35em] text-emerald-700 dark:text-emerald-300">Retry launched</p>
+            <h3 class="mt-2 text-2xl font-extrabold tracking-tight text-emerald-950 dark:text-emerald-50">
+              Fresh job created and now live
+            </h3>
+            <p class="mt-2 max-w-2xl text-sm leading-6 text-emerald-900/80 dark:text-emerald-100/80">
+              This run was created from retrying
+              <span class="font-mono font-semibold">{{ retryLaunch.previousJobId }}</span>
+              and is now being tracked as
+              <span class="font-mono font-semibold">{{ retryLaunch.newJobId }}</span>.
+            </p>
+          </div>
+
+          <div class="grid min-w-[260px] gap-3 sm:grid-cols-2">
+            <div class="rounded-2xl border border-emerald-200/80 bg-white/80 px-4 py-4 backdrop-blur dark:border-emerald-900/60 dark:bg-emerald-950/30">
+              <p class="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700/70 dark:text-emerald-300/70">Previous job</p>
+              <p class="mt-2 break-all font-mono text-sm font-bold text-emerald-950 dark:text-emerald-50">{{ retryLaunch.previousJobId }}</p>
+            </div>
+            <div class="rounded-2xl border border-emerald-200/80 bg-white/80 px-4 py-4 backdrop-blur dark:border-emerald-900/60 dark:bg-emerald-950/30">
+              <p class="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700/70 dark:text-emerald-300/70">New live job</p>
+              <p class="mt-2 break-all font-mono text-sm font-bold text-emerald-950 dark:text-emerald-50">{{ retryLaunch.newJobId }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div class="glass-panel px-6 py-8">
         <div class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
@@ -190,10 +223,12 @@ export class JobDetailsComponent implements OnInit, OnDestroy {
   error = '';
   deleting = false;
   retrying = false;
+  retryLaunch: { previousJobId: string; newJobId: string } | null = null;
 
   private socket?: WebSocket;
   private reconnectTimeout?: number;
   private reconnectAttempts = 0;
+  private routeSubscription?: Subscription;
 
   get mergedJob(): JobRecord | null {
     if (!this.job && !this.statusData) {
@@ -231,12 +266,23 @@ export class JobDetailsComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.jobId = this.route.snapshot.paramMap.get('jobId') ?? '';
-    void this.loadDetails();
-    this.connectSocket();
+    this.routeSubscription = this.route.paramMap.subscribe((params) => {
+      const nextJobId = params.get('jobId') ?? '';
+
+      if (!nextJobId) {
+        return;
+      }
+
+      this.jobId = nextJobId;
+      this.resetViewState();
+      this.captureRetryLaunchState();
+      void this.loadDetails();
+      this.reconnectSocket();
+    });
   }
 
   ngOnDestroy(): void {
+    this.routeSubscription?.unsubscribe();
     if (this.reconnectTimeout) {
       window.clearTimeout(this.reconnectTimeout);
     }
@@ -264,7 +310,14 @@ export class JobDetailsComponent implements OnInit, OnDestroy {
     try {
       this.retrying = true;
       const data = await this.api.retryJob(this.jobId);
-      await this.router.navigate(['/jobs', data.job_id]);
+      await this.router.navigate(['/jobs', data.job_id], {
+        state: {
+          retryLaunch: {
+            previousJobId: this.jobId,
+            newJobId: data.job_id,
+          },
+        },
+      });
     } catch (error: unknown) {
       this.error = this.resolveError(error, 'Unable to retry this job.');
     } finally {
@@ -295,6 +348,49 @@ export class JobDetailsComponent implements OnInit, OnDestroy {
 
   trackByPreviewSample(index: number, sample: PreviewSample): string {
     return `${sample.source_value ?? 'source'}-${sample.transformed_value ?? 'target'}-${index}`;
+  }
+
+  private captureRetryLaunchState(): void {
+    const state = (history.state as {
+      retryLaunch?: { previousJobId?: string; newJobId?: string };
+    })?.retryLaunch;
+
+    if (
+      state?.previousJobId &&
+      state?.newJobId &&
+      state.newJobId === this.jobId &&
+      state.previousJobId !== this.jobId
+    ) {
+      this.retryLaunch = {
+        previousJobId: state.previousJobId,
+        newJobId: state.newJobId,
+      };
+      return;
+    }
+
+    this.retryLaunch = null;
+  }
+
+  private resetViewState(): void {
+    this.loading = true;
+    this.error = '';
+    this.job = null;
+    this.statusData = null;
+    this.logs = [];
+    this.failedRecords = [];
+    this.preview = [];
+  }
+
+  private reconnectSocket(): void {
+    if (this.reconnectTimeout) {
+      window.clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = undefined;
+    }
+
+    this.socket?.close();
+    this.socket = undefined;
+    this.reconnectAttempts = 0;
+    this.connectSocket();
   }
 
   private async loadDetails(): Promise<void> {
