@@ -9,6 +9,8 @@ from app.utils.date_parser import validate_canonical_format
 
 SUPPORTED_FORMAT_ALIASES: dict[str, str] = {
     "ISO": "YYYY-MM-DD",
+    "ISO8601": "YYYY-MM-DDTHH:mm:ssZ",
+    "ISO 8601": "YYYY-MM-DDTHH:mm:ssZ",
     "US": "MM/DD/YYYY",
     "EU": "DD-MM-YYYY",
     "EUROPEAN": "DD-MM-YYYY",
@@ -19,9 +21,40 @@ SUPPORTED_FORMAT_ALIASES: dict[str, str] = {
     "TIME": "HH:mm:ss",
     "DATETIME": "YYYY-MM-DD HH:mm:ss",
     "RFC3339": "YYYY-MM-DDTHH:mm:ssZ",
+    "SQL DATETIME": "YYYY-MM-DD HH:mm:ss",
+    "UNIX DATE": "YYYY-MM-DD",
+    "YEAR MONTH DAY": "YYYY-MM-DD",
+    "MONTH DAY YEAR": "MM/DD/YYYY",
+    "DAY MONTH YEAR": "DD-MM-YYYY",
+    "YEAR/MONTH/DAY": "YYYY/MM/DD",
+    "YEAR-MONTH-DAY": "YYYY-MM-DD",
+    "MONTH/DAY/YEAR": "MM/DD/YYYY",
+    "DAY/MONTH/YEAR": "DD/MM/YYYY",
+    "MONTH-DAY-YEAR": "MM/DD/YYYY",
+    "DAY-MONTH-YEAR": "DD-MM-YYYY",
 }
 
 _SUPPORTED_LITERAL_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (
+        re.compile(r"\bYYYY-MM-DDTHH:mm:ss(?:\.\w+)?Z\b", re.IGNORECASE),
+        "YYYY-MM-DDTHH:mm:ssZ",
+    ),
+    (
+        re.compile(r"\bYYYY-MM-DDTHH:mm:ss\b", re.IGNORECASE),
+        "YYYY-MM-DDTHH:mm:ss",
+    ),
+    (
+        re.compile(r"\bYYYY-MM-DD HH:mm:ss\b", re.IGNORECASE),
+        "YYYY-MM-DD HH:mm:ss",
+    ),
+    (
+        re.compile(r"\bDD-MM-YYYY HH:mm:ss\b", re.IGNORECASE),
+        "DD-MM-YYYY HH:mm:ss",
+    ),
+    (
+        re.compile(r"\bDD/MM/YYYY HH:mm:ss\b", re.IGNORECASE),
+        "DD-MM-YYYY HH:mm:ss",
+    ),
     (
         re.compile(r"\bDD-MM-YY HH:mm:ss\b", re.IGNORECASE),
         "DD-MM-YY HH:mm:ss",
@@ -33,10 +66,6 @@ _SUPPORTED_LITERAL_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (
         re.compile(r"\bYYYY-MM-DD HH:mm:ss\b", re.IGNORECASE),
         "YYYY-MM-DD HH:mm:ss",
-    ),
-    (
-        re.compile(r"\bYYYY-MM-DDTHH:mm:ss\b", re.IGNORECASE),
-        "YYYY-MM-DDTHH:mm:ss",
     ),
     (
         re.compile(r"\bYYYY/MM/DD\b", re.IGNORECASE),
@@ -55,6 +84,14 @@ _SUPPORTED_LITERAL_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
         "DD-MM-YYYY",
     ),
     (
+        re.compile(r"\bMM-DD-YYYY\b", re.IGNORECASE),
+        "MM/DD/YYYY",
+    ),
+    (
+        re.compile(r"\bMM-DD-YY\b", re.IGNORECASE),
+        "MM/DD/YYYY",
+    ),
+    (
         re.compile(r"\bDD[/-]MM[/-]YY\s+HH[:.]mm[:.]ss\b", re.IGNORECASE),
         "DD-MM-YY HH:mm:ss",
     ),
@@ -63,8 +100,20 @@ _SUPPORTED_LITERAL_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
         "DD-MM-YY",
     ),
     (
+        re.compile(r"\bYY[/-]MM[/-]DD\b", re.IGNORECASE),
+        "YY-MM-DD",
+    ),
+    (
         re.compile(r"\bYYYYMMDD\b", re.IGNORECASE),
         "YYYYMMDD",
+    ),
+    (
+        re.compile(r"\bHH:mm:ss\b", re.IGNORECASE),
+        "HH:mm:ss",
+    ),
+    (
+        re.compile(r"\bHH:mm\b", re.IGNORECASE),
+        "HH:mm:ss",
     ),
 )
 _DIRECT_CANONICAL_PATTERNS: tuple[re.Pattern[str], ...] = (
@@ -84,6 +133,41 @@ _DIRECT_CANONICAL_PATTERNS: tuple[re.Pattern[str], ...] = (
 
 _UNICODE_DASH_PATTERN = re.compile(r"[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]")
 _WHITESPACE_PATTERN = re.compile(r"\s+")
+_PUNCT_TO_SPACE_PATTERN = re.compile(r"[_.,]+")
+_DESCRIPTIVE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (
+        re.compile(r"\b(iso(\s*8601)?|rfc\s*3339|timestamp|utc timestamp|zulu timestamp)\b", re.IGNORECASE),
+        "YYYY-MM-DDTHH:mm:ssZ",
+    ),
+    (
+        re.compile(r"\b(datetime|date\s*time|sql datetime|postgres datetime|mysql datetime)\b", re.IGNORECASE),
+        "YYYY-MM-DD HH:mm:ss",
+    ),
+    (
+        re.compile(r"\b(time only|only time|hours minutes seconds|hh mm ss)\b", re.IGNORECASE),
+        "HH:mm:ss",
+    ),
+    (
+        re.compile(r"\b(year month day|yyyy month dd|year-month-day)\b", re.IGNORECASE),
+        "YYYY-MM-DD",
+    ),
+    (
+        re.compile(r"\b(month day year|month-date-year|us date|american date)\b", re.IGNORECASE),
+        "MM/DD/YYYY",
+    ),
+    (
+        re.compile(r"\b(day month year|date-month-year|european date|uk date|indian date)\b", re.IGNORECASE),
+        "DD-MM-YYYY",
+    ),
+    (
+        re.compile(r"\b(slash date|yyyy slash mm slash dd)\b", re.IGNORECASE),
+        "YYYY/MM/DD",
+    ),
+    (
+        re.compile(r"\b(compact date|yyyymmdd|digits only date)\b", re.IGNORECASE),
+        "YYYYMMDD",
+    ),
+)
 
 
 def normalize_prompt_text(prompt: str) -> str:
@@ -94,8 +178,11 @@ def normalize_prompt_text(prompt: str) -> str:
     normalized = normalized.replace("\u200B", "")
     normalized = normalized.replace("\u200C", "")
     normalized = normalized.replace("\u200D", "")
+    normalized = _PUNCT_TO_SPACE_PATTERN.sub(" ", normalized)
     normalized = _WHITESPACE_PATTERN.sub(" ", normalized)
     return normalized.strip()
+
+
 def normalize_resolved_format(candidate: str | None) -> str | None:
     """Normalize date-format tokens into the service's canonical representation."""
 
@@ -132,6 +219,22 @@ def normalize_resolved_format(candidate: str | None) -> str | None:
 
     if validate_canonical_format(normalized):
         return normalized
+
+    return None
+
+
+def resolve_descriptive_format(prompt: str) -> str | None:
+    """Resolve broader human-readable date format descriptions."""
+
+    normalized_prompt = normalize_prompt_text(prompt)
+
+    for pattern, resolved_format in _DESCRIPTIVE_PATTERNS:
+        if pattern.search(normalized_prompt):
+            logger.info(
+                "Descriptive resolver matched date format",
+                resolved_format=resolved_format,
+            )
+            return resolved_format
 
     return None
 

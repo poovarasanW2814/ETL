@@ -333,3 +333,116 @@ class JobAnalyticsResponse(BaseModel):
     page: int
     limit: int
     total: int
+
+
+class MongoCollectionResponse(BaseModel):
+    """MongoDB collection metadata returned to the UI."""
+
+    name: str = Field(..., description="Collection name")
+
+
+class MongoDatabaseResponse(BaseModel):
+    """MongoDB database metadata returned to the UI."""
+
+    name: str = Field(..., description="Database name")
+
+
+class MongoDatabasesResponse(BaseModel):
+    """List of databases available for a MongoDB connection."""
+
+    databases: list[MongoDatabaseResponse] = Field(
+        ...,
+        description="Available databases",
+    )
+
+
+class MongoCollectionsResponse(BaseModel):
+    """List of collections available in a MongoDB database."""
+
+    database_name: str = Field(..., description="Database name")
+    collections: list[MongoCollectionResponse] = Field(
+        ...,
+        description="Available collections",
+    )
+
+
+class MongoPreviewRowResponse(BaseModel):
+    """A single preview row from a MongoDB collection."""
+
+    values: dict[str, object | None] = Field(
+        ...,
+        description="Row values keyed by column name",
+    )
+
+
+class MongoCollectionPreviewResponse(BaseModel):
+    """Tabular preview for a MongoDB collection."""
+
+    database_name: str = Field(..., description="Database name")
+    collection_name: str = Field(..., description="Collection name")
+    columns: list[str] = Field(..., description="Resolved preview columns")
+    rows: list[MongoPreviewRowResponse] = Field(..., description="Preview rows")
+    total_rows: int = Field(..., description="Number of preview rows returned")
+
+
+class MongoWriteResponse(BaseModel):
+    """Result of a MongoDB destination write operation."""
+
+    database_name: str = Field(..., description="Database name")
+    collection_name: str = Field(..., description="Destination collection name")
+    write_mode: str = Field(..., description="Applied write mode")
+    rows_written: int = Field(..., description="Number of rows written")
+
+
+class DbNameResponse(BaseModel):
+    """Database/catalog metadata returned to the UI."""
+
+    name: str = Field(..., description="Database name")
+
+
+class DbDatabasesResponse(BaseModel):
+    """List of databases available for a connection."""
+
+    db_type: str = Field(..., description="Database type")
+    databases: list[DbNameResponse] = Field(..., description="Available databases")
+
+
+class DbTableNameResponse(BaseModel):
+    """Table or collection metadata returned to the UI."""
+
+    name: str = Field(..., description="Table or collection name")
+
+
+class DbTablesResponse(BaseModel):
+    """List of tables or collections available in a database."""
+
+    db_type: str = Field(..., description="Database type")
+    database_name: str = Field(..., description="Database name")
+    tables: list[DbTableNameResponse] = Field(..., description="Available tables or collections")
+
+
+class DbPreviewRowResponse(BaseModel):
+    """A single preview row from a table or collection."""
+
+    values: dict[str, object | None] = Field(..., description="Row values keyed by column name")
+
+
+class DbTablePreviewResponse(BaseModel):
+    """Tabular preview for a selected source table or collection."""
+
+    db_type: str = Field(..., description="Database type")
+    database_name: str = Field(..., description="Database name")
+    table_name: str = Field(..., description="Table or collection name")
+    columns: list[str] = Field(..., description="Resolved preview columns")
+    rows: list[DbPreviewRowResponse] = Field(..., description="Preview rows")
+    total_rows: int = Field(..., description="Number of rows returned")
+
+
+class DbWriteResponse(BaseModel):
+    """Result of a destination write operation."""
+
+    db_type: str = Field(..., description="Database type")
+    database_name: str = Field(..., description="Database name")
+    table_name: str = Field(..., description="Destination table or collection name")
+    write_mode: str = Field(..., description="Applied write mode")
+    rows_written: int = Field(..., description="Number of rows written")

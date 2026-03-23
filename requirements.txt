@@ -4,12 +4,16 @@ pydantic
 pydantic-settings
 python-multipart
 
+cryptography 
+
 celery
 redis
 flower
 
 motor
 pymongo
+sqlalchemy
+pymysql
 
 pandas
 numpy

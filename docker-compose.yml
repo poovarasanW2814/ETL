@@ -1,49 +1,51 @@
-version: '3.8'
-
 services:
   redis:
-    image: redis:alpine
+    image: redis:7-alpine
+    container_name: mcp-dlt-redis
     ports:
       - "6379:6379"
-    networks:
-      - mcp-network
-
+    restart: unless-stopped
+  
   api:
     build:
       context: .
       dockerfile: deployments/docker/Dockerfile.api
-    ports:
-      - "8000:8000"
-    environment:
-      - REDIS_URL=redis://redis:6379/0
+    container_name: mcp-dlt-api
     depends_on:
       - redis
-    networks:
-      - mcp-network
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
 
   worker:
     build:
       context: .
       dockerfile: deployments/docker/Dockerfile.worker
-    command: celery -A app.infrastructure.messaging.celery_app worker -Q transform_dates --loglevel=info
-    environment:
-      - REDIS_URL=redis://redis:6379/0
+    container_name: mcp-dlt-worker
     depends_on:
       - redis
-    networks:
-      - mcp-network
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: celery -A app.infrastructure.messaging.celery_app worker -Q transform_dates -l info -P solo
+    restart: unless-stopped
 
-  flower:
-    image: mher/flower
+  frontend:
+    build:
+      context: mcp-transform-ui
+      dockerfile: Dockerfile
+    container_name: mcp-transform-ui
     ports:
-      - "5555:5555"
-    environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
+      - "4200:80"
     depends_on:
-      - redis
-    networks:
-      - mcp-network
-
-networks:
-  mcp-network:
-    driver: bridge
+      - api
+    restart: unless-stopped

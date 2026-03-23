@@ -181,6 +181,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.total = data.total ?? 0;
       this.error = '';
     } catch (error: unknown) {
+      console.error('Dashboard loadJobs failed', error);
       this.error = this.resolveError(
         error,
         'Unable to load MCP jobs. Ensure the backend exposes /api/v1/mcp-jobs.',
@@ -219,9 +220,29 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   private resolveError(error: unknown, fallback: string): string {
-    if (typeof error === 'object' && error && 'error' in error) {
-      const inner = (error as { error?: { detail?: string } }).error;
-      return inner?.detail ?? fallback;
+    if (typeof error === 'object' && error) {
+      const httpError = error as {
+        status?: number;
+        statusText?: string;
+        message?: string;
+        error?: { detail?: string } | string;
+      };
+
+      if (typeof httpError.error === 'object' && httpError.error?.detail) {
+        return httpError.error.detail;
+      }
+
+      if (typeof httpError.error === 'string' && httpError.error.trim()) {
+        return httpError.error;
+      }
+
+      if (httpError.status && httpError.statusText) {
+        return `Unable to load MCP jobs (${httpError.status} ${httpError.statusText}).`;
+      }
+
+      if (httpError.message) {
+        return httpError.message;
+      }
     }
 
     return fallback;

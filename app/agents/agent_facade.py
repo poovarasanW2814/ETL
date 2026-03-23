@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import re
+
 from app.agents.format_resolver import (
     detect_literal_format,
     normalize_prompt_text,
     normalize_resolved_format,
+    resolve_descriptive_format,
     resolve_alias,
 )
 from app.agents.prompt_analyzer import analyze_prompt_plan
@@ -21,10 +24,12 @@ _DIRECT_CANONICAL_FORMATS: tuple[str, ...] = (
     "DD-MM-YYYY HH:mm:ss",
     "YYYY/MM/DD",
     "YYYY-MM-DD",
-    "MM/DD/YYYY",
     "DD-MM-YYYY",
     "DD/MM/YYYY",
+    "MM/DD/YYYY",
     "YYYYMMDD",
+    "YY-MM-DD",
+    "DD-MM-YY",
     "HH:mm:ss",
 )
 
@@ -48,7 +53,8 @@ def resolve_transformation_plan(
 
     normalized_prompt = normalize_prompt_text(prompt)
     for candidate in _DIRECT_CANONICAL_FORMATS:
-        if candidate.lower() in normalized_prompt.lower():
+        candidate_pattern = rf"(?<![A-Za-z0-9]){candidate.lower()}(?![A-Za-z0-9])"
+        if re.search(candidate_pattern, normalized_prompt.lower()):
             resolved_format = normalize_resolved_format(candidate)
             if resolved_format is not None:
                 return {
@@ -108,6 +114,15 @@ def resolve_transformation_plan(
             "source_format_hint": tool_detect_source_format(values or []),
             "timezone_strategy": "strip" if "HH" in literal_format or "Z" in literal_format else "none",
             "confidence": 0.7,
+        }
+
+    descriptive_format = resolve_descriptive_format(normalized_prompt)
+    if descriptive_format is not None:
+        return {
+            "target_format": descriptive_format,
+            "source_format_hint": tool_detect_source_format(values or []),
+            "timezone_strategy": "strip" if "HH" in descriptive_format or "Z" in descriptive_format else "none",
+            "confidence": 0.68,
         }
 
     resolved_format = resolve_alias(normalized_prompt)

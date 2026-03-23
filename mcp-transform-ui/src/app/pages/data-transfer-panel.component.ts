@@ -10,6 +10,13 @@ interface ParsedData {
   rows: (string | number | boolean | null)[][];
 }
 
+interface DateDetectionResult {
+  isLikelyDate: boolean;
+  score: number;
+  sampleCount: number;
+  matchedCount: number;
+}
+
 @Component({
   selector: 'app-data-transfer-panel',
   standalone: true,
@@ -22,20 +29,18 @@ interface ParsedData {
         <div class="mt-3">
           <h2 class="text-3xl font-extrabold tracking-tight text-ink dark:text-slate-100">Data Transfer Panel</h2>
           <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-            Upload Excel or CSV files to transfer and process data across your ETL pipelines.
+            Upload Excel or CSV files to transform selected columns and download the result.
           </p>
         </div>
       </div>
 
-      <!-- File Upload and Column Selection -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- File Upload Section (Left) -->
         <div class="glass-panel px-6 py-8">
           <h3 class="text-lg font-extrabold text-ink dark:text-slate-100">Upload File</h3>
           <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
             .xlsx, .xls, or .csv
           </p>
-          
+
           <div class="mt-4">
             <label class="flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 px-4 py-8 transition hover:border-amber-400 hover:bg-amber-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-amber-500 dark:hover:bg-slate-800/50">
               <input
@@ -71,12 +76,11 @@ interface ParsedData {
                   (click)="clearFile()"
                   class="flex-shrink-0 text-emerald-600 transition hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300"
                 >
-                  ✕
+                  x
                 </button>
               </div>
             </div>
 
-            <!-- Action Buttons -->
             <div class="mt-4 flex gap-2">
               <button
                 type="button"
@@ -98,13 +102,25 @@ interface ParsedData {
           </div>
         </div>
 
-        <!-- Column Selection Section (Right) -->
         <div *ngIf="parsedData()" class="glass-panel px-6 py-8">
           <h3 class="text-lg font-extrabold text-ink dark:text-slate-100">Select & Configure Columns</h3>
           <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-            Found {{ parsedData()!.columns.length }} columns
+            Found {{ parsedData()!.columns.length }} columns. Likely date columns are preselected from sample values.
           </p>
-          
+          <div class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Generated IDs</p>
+            <div class="mt-2 grid gap-2 sm:grid-cols-2">
+              <div>
+                <p class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Pipeline ID</p>
+                <p class="mt-1 break-all font-mono text-xs text-ink dark:text-slate-100">{{ pendingPipelineId() }}</p>
+              </div>
+              <div>
+                <p class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Batch ID</p>
+                <p class="mt-1 break-all font-mono text-xs text-ink dark:text-slate-100">{{ pendingBatchId() }}</p>
+              </div>
+            </div>
+          </div>
+
           <form [formGroup]="columnConfigForm" class="mt-4 space-y-3 max-h-96 overflow-y-auto">
             <div formArrayName="columns" class="space-y-3">
               <div
@@ -123,17 +139,26 @@ interface ParsedData {
                   <label [for]="'col-' + i" class="text-sm font-semibold text-slate-700 dark:text-slate-300 cursor-pointer flex-1">
                     {{ column.get('source_column')!.value }}
                   </label>
+                  <span
+                    *ngIf="isLikelyDateColumn(column.get('source_column')!.value)"
+                    class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                  >
+                    Likely date
+                  </span>
                 </div>
 
-                <div *ngIf="column.get('selected')!.value && isDateColumn(column.get('source_column')!.value)" class="ml-6 space-y-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                <div *ngIf="column.get('selected')!.value && isLikelyDateColumn(column.get('source_column')!.value)" class="ml-6 space-y-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                    Enter a prompt to transform this column as a date. Leave it blank to keep the original values unchanged.
+                  </p>
                   <div>
                     <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Output Format
+                      Output Format Prompt
                     </label>
                     <input
                       type="text"
                       formControlName="prompt"
-                      placeholder="e.g., 'YYYY-MM-DD'"
+                      placeholder="e.g., Convert to YYYY-MM-DD"
                       class="w-full px-2 py-1 border border-slate-300 rounded text-xs dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100"
                     />
                   </div>
@@ -147,7 +172,7 @@ interface ParsedData {
                       class="w-3 h-3 cursor-pointer"
                     />
                     <label [for]="'new-col-' + i" class="text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
-                      New Column
+                      Write result to new column
                     </label>
                   </div>
 
@@ -155,7 +180,7 @@ interface ParsedData {
                     <input
                       type="text"
                       formControlName="target_column"
-                      placeholder="Name"
+                      placeholder="New column name"
                       class="w-full px-2 py-1 border border-slate-300 rounded text-xs dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100"
                     />
                   </div>
@@ -164,7 +189,6 @@ interface ParsedData {
             </div>
           </form>
 
-          <!-- Select Columns Button -->
           <div class="mt-4">
             <button
               (click)="startTransformation()"
@@ -177,7 +201,6 @@ interface ParsedData {
         </div>
       </div>
 
-      <!-- Original Data Preview -->
       <div *ngIf="parsedData()" class="glass-panel px-6 py-8">
         <h3 class="text-lg font-extrabold text-ink dark:text-slate-100">Original Data</h3>
         <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
@@ -188,7 +211,6 @@ interface ParsedData {
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900">
-                <th class="px-4 py-3 text-left font-semibold text-slate-700 dark:text-slate-300">#</th>
                 <th
                   *ngFor="let column of parsedData()!.columns"
                   class="px-4 py-3 text-left font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap"
@@ -202,7 +224,6 @@ interface ParsedData {
                 *ngFor="let row of parsedData()!.rows.slice(0, 10); let i = index"
                 class="border-b border-slate-100 transition hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/50"
               >
-                <td class="px-4 py-3 text-slate-500 dark:text-slate-400">{{ i + 1 }}</td>
                 <td
                   *ngFor="let cell of row"
                   class="px-4 py-3 text-slate-700 dark:text-slate-300 truncate max-w-xs"
@@ -215,7 +236,6 @@ interface ParsedData {
         </div>
       </div>
 
-      <!-- Transformed Data Preview -->
       <div *ngIf="transformedData()" class="glass-panel px-6 py-8">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -238,7 +258,6 @@ interface ParsedData {
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900">
-                <th class="px-4 py-3 text-left font-semibold text-slate-700 dark:text-slate-300">#</th>
                 <th
                   *ngFor="let column of transformedData()!.columns"
                   class="px-4 py-3 text-left font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap"
@@ -252,7 +271,6 @@ interface ParsedData {
                 *ngFor="let row of transformedData()!.rows.slice(0, 10); let i = index"
                 class="border-b border-slate-100 transition hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/50"
               >
-                <td class="px-4 py-3 text-slate-500 dark:text-slate-400">{{ i + 1 }}</td>
                 <td
                   *ngFor="let cell of row"
                   class="px-4 py-3 text-slate-700 dark:text-slate-300 truncate max-w-xs"
@@ -265,7 +283,6 @@ interface ParsedData {
         </div>
       </div>
 
-      <!-- Loading State -->
       <div *ngIf="isLoading()" class="glass-panel px-6 py-8">
         <div class="flex items-center gap-3">
           <div class="h-5 w-5 animate-spin rounded-full border-2 border-amber-600 border-t-transparent dark:border-amber-500"></div>
@@ -273,59 +290,22 @@ interface ParsedData {
         </div>
       </div>
 
-      <!-- Transformation Loading State -->
       <div *ngIf="isTransforming()" class="glass-panel px-6 py-8">
-        <div class="flex items-center gap-3">
-          <div class="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent dark:border-blue-500"></div>
-          <p class="text-sm font-semibold text-slate-700 dark:text-slate-300">Transforming data...</p>
-        </div>
-      </div>
-
-      <!-- Database Transfer Loading State -->
-      <div *ngIf="isTransferingToDb()" class="glass-panel px-6 py-8">
-        <div class="flex items-center gap-3">
-          <div class="h-5 w-5 animate-spin rounded-full border-2 border-green-600 border-t-transparent dark:border-green-500"></div>
-          <p class="text-sm font-semibold text-slate-700 dark:text-slate-300">Transferring to database...</p>
-        </div>
-      </div>
-
-      <!-- Database Upload Section -->
-      <div *ngIf="showDatabaseSection()" class="glass-panel px-6 py-8">
-        <h3 class="text-lg font-extrabold text-ink dark:text-slate-100">Upload To Database</h3>
-        <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-          Choose the transformed fields you want to send to the database.
-        </p>
-
-        <form [formGroup]="transferForm" class="mt-4 space-y-3">
-          <div formArrayName="columns" class="grid gap-3 md:grid-cols-2">
-            <label
-              *ngFor="let column of transferColumnsFormArray.controls; let i = index"
-              [formGroupName]="i"
-              class="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200"
-            >
-              <input
-                type="checkbox"
-                formControlName="selected"
-                class="h-4 w-4 cursor-pointer accent-green-600"
-              />
-              <span>{{ column.get('column_name')!.value }}</span>
-            </label>
+        <p class="text-sm font-semibold text-slate-700 dark:text-slate-300">Transforming data...</p>
+        <div class="mt-4">
+          <div class="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400">
+            <span>Progress</span>
+            <span>{{ transformProgressPercent() }}%</span>
           </div>
-        </form>
-
-        <div class="mt-5">
-          <button
-            type="button"
-            (click)="transferToDatabase()"
-            [disabled]="isTransferingToDb() || !hasTransferColumnsSelected()"
-            class="w-full rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-emerald-500 dark:hover:bg-emerald-600"
-          >
-            {{ isTransferingToDb() ? 'Uploading...' : 'Upload To Database' }}
-          </button>
+          <div class="mt-2 h-2 w-full rounded-full bg-slate-200 dark:bg-slate-700">
+            <div
+              class="h-2 rounded-full bg-blue-600 transition-all duration-500 dark:bg-blue-500"
+              [style.width.%]="transformProgressPercent()"
+            ></div>
+          </div>
         </div>
       </div>
 
-      <!-- Error State -->
       <div *ngIf="error()" class="glass-panel border-rose-200 px-6 py-8 text-rose-700 dark:border-rose-900/70 dark:text-rose-300">
         <p class="text-sm font-semibold">Error processing file:</p>
         <p class="mt-1 text-xs">{{ error() }}</p>
@@ -341,16 +321,17 @@ export class DataTransferPanelComponent {
   isLoading = signal(false);
   error = signal<string | null>(null);
   isTransforming = signal(false);
-  isTransferingToDb = signal(false);
+  transformProgressPercent = signal(0);
   Math = Math;
 
   columnConfigForm: FormGroup;
-  transferForm: FormGroup;
-  pipelineId = 'default-pipeline';
-  batchId = 'default-batch';
-  private apiUrl = 'http://127.0.0.1:8000/api/v1/transform-dates';
-  private transformStatusUrl = 'http://127.0.0.1:8000/api/v1/transform-status';
-  private dbTransferUrl = 'http://127.0.0.1:8000/api/v1/transfer-to-db';
+  private readonly apiBaseUrl =
+    (globalThis as { __MCP_API_BASE_URL__?: string }).__MCP_API_BASE_URL__ ?? 'http://localhost:8000';
+  private readonly apiUrl = `${this.apiBaseUrl}/api/v1/transform-dates`;
+  private readonly transformStatusUrl = `${this.apiBaseUrl}/api/v1/transform-status`;
+  private dateDetection = signal<Record<string, DateDetectionResult>>({});
+  pendingPipelineId = signal<string>('');
+  pendingBatchId = signal<string>('');
   selectedColumnsForDisplay = signal<string[]>([]);
   transformedDateColumns = signal<any[]>([]);
 
@@ -358,58 +339,33 @@ export class DataTransferPanelComponent {
     this.columnConfigForm = this.fb.group({
       columns: this.fb.array([])
     });
-    this.transferForm = this.fb.group({
-      columns: this.fb.array([])
-    });
+    this.refreshGeneratedIds();
   }
 
   get columnsFormArray(): FormArray {
     return this.columnConfigForm.get('columns') as FormArray;
   }
 
-  get transferColumnsFormArray(): FormArray {
-    return this.transferForm.get('columns') as FormArray;
-  }
-
-  isDateColumn(columnName: string): boolean {
-    const lowerName = columnName.toLowerCase();
-    return lowerName.includes('date') || lowerName.includes('time') || lowerName.includes('timestamp');
-  }
-
-  getSelectedDateColumns(): any[] {
-    return this.columnsFormArray.value.filter((col: any) => col.selected && this.isDateColumn(col.source_column));
+  isLikelyDateColumn(columnName: string): boolean {
+    return this.dateDetection()[columnName]?.isLikelyDate ?? false;
   }
 
   hasSelectedColumns(): boolean {
     return this.columnsFormArray.value.some((col: any) => col.selected);
   }
 
-  hasTransferColumnsSelected(): boolean {
-    return this.transferColumnsFormArray.value.some((col: any) => col.selected);
-  }
-
-  showDatabaseSection(): boolean {
-    return !!this.transformedData() && this.transferColumnsFormArray.length > 0;
-  }
-
   getDisplayColumns(): string[] {
     if (this.selectedColumnsForDisplay().length === 0) {
       return this.parsedData()?.columns || [];
     }
-    
+
     const selected = this.selectedColumnsForDisplay();
     const transformed = this.transformedDateColumns();
-    
-    return this.parsedData()?.columns.filter(col => 
-      selected.includes(col) || 
+
+    return this.parsedData()?.columns.filter(col =>
+      selected.includes(col) ||
       transformed.some(dc => dc.target_column === col || (dc.isNewColumn === false && dc.source_column === col))
     ) || [];
-  }
-
-  getTransformedColumnsDisplay(): string {
-    return this.transformedDateColumns()
-      .map((d: any) => d.isNewColumn ? `${d.target_column} (new)` : d.source_column)
-      .join(', ');
   }
 
   private buildPreviewData(data: ParsedData, columnsToKeep: string[]): ParsedData {
@@ -459,15 +415,22 @@ export class DataTransferPanelComponent {
   private pollTransformationStatus(
     jobId: string,
     currentData: ParsedData,
-    selectedColumns: any[],
-    maxAttempts = 40
+    selectedColumns: any[]
   ): void {
-    let attempts = 0;
 
     const checkStatus = () => {
       this.http.get<any>(`${this.transformStatusUrl}/${jobId}`).subscribe({
         next: (statusResponse) => {
           this.zone.run(() => {
+            const progressValue =
+              typeof statusResponse?.progress?.progress === 'number'
+                ? Math.max(0, Math.min(100, Math.round(statusResponse.progress.progress)))
+                : null;
+
+            if (progressValue !== null) {
+              this.transformProgressPercent.set(progressValue);
+            }
+
             if (statusResponse.status === 'SUCCESS' && statusResponse.result?.columns) {
               const transformedData = this.buildTransformedData(
                 currentData,
@@ -476,8 +439,8 @@ export class DataTransferPanelComponent {
               );
 
               this.transformedData.set(transformedData);
-              this.initializeTransferForm(transformedData.columns);
               this.isTransforming.set(false);
+              this.transformProgressPercent.set(100);
               this.error.set(null);
               return;
             }
@@ -485,13 +448,7 @@ export class DataTransferPanelComponent {
             if (statusResponse.status === 'FAILED') {
               this.error.set(statusResponse.error || 'Transformation failed');
               this.isTransforming.set(false);
-              return;
-            }
-
-            attempts += 1;
-            if (attempts >= maxAttempts) {
-              this.error.set('Transformation is taking too long. Please try again.');
-              this.isTransforming.set(false);
+              this.transformProgressPercent.set(0);
               return;
             }
 
@@ -502,6 +459,7 @@ export class DataTransferPanelComponent {
           this.zone.run(() => {
             this.error.set(`Failed to fetch transformation status: ${err.message || 'Unknown error'}`);
             this.isTransforming.set(false);
+            this.transformProgressPercent.set(0);
           });
         }
       });
@@ -517,10 +475,11 @@ export class DataTransferPanelComponent {
       this.parsedData.set(null);
       this.transformedData.set(null);
       this.error.set(null);
+      this.dateDetection.set({});
       this.selectedColumnsForDisplay.set([]);
       this.transformedDateColumns.set([]);
       this.columnsFormArray.clear();
-      this.transferColumnsFormArray.clear();
+      this.refreshGeneratedIds();
     }
   }
 
@@ -529,10 +488,11 @@ export class DataTransferPanelComponent {
     this.parsedData.set(null);
     this.transformedData.set(null);
     this.error.set(null);
+    this.dateDetection.set({});
     this.selectedColumnsForDisplay.set([]);
     this.transformedDateColumns.set([]);
     this.columnsFormArray.clear();
-    this.transferColumnsFormArray.clear();
+    this.refreshGeneratedIds();
   }
 
   async processFile(): Promise<void> {
@@ -542,45 +502,35 @@ export class DataTransferPanelComponent {
       return;
     }
 
-    console.log('Processing file:', file.name);
     this.isLoading.set(true);
     this.error.set(null);
 
     try {
       const fileExtension = file.name.split('.').pop()?.toLowerCase();
-      console.log('File extension:', fileExtension);
-
       let data: ParsedData | null = null;
 
       if (fileExtension === 'csv') {
-        console.log('Parsing CSV file...');
         data = await this.parseCSV(file);
       } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
-        console.log('Parsing Excel file...');
         data = await this.parseExcel(file);
       } else {
-        const errorMsg = 'Unsupported file format. Please upload a CSV or Excel file.';
-        console.error(errorMsg);
-        this.error.set(errorMsg);
+        this.error.set('Unsupported file format. Please upload a CSV or Excel file.');
         this.isLoading.set(false);
         return;
       }
 
       if (data) {
-        console.log('Parsed data:', data);
         this.zone.run(() => {
           this.parsedData.set(data);
           this.transformedData.set(null);
           this.selectedColumnsForDisplay.set([]);
           this.transformedDateColumns.set([]);
-          this.initializeColumnForm(data.columns);
-          this.transferColumnsFormArray.clear();
+          this.initializeColumnForm(data);
           this.isLoading.set(false);
         });
       }
     } catch (err) {
       const errorMsg = `Failed to parse file: ${err instanceof Error ? err.message : 'Unknown error'}`;
-      console.error('Error:', errorMsg, err);
       this.zone.run(() => {
         this.error.set(errorMsg);
         this.isLoading.set(false);
@@ -647,18 +597,15 @@ export class DataTransferPanelComponent {
       reader.onload = (e) => {
         try {
           const data = e.target?.result as ArrayBuffer;
-          const workbook = XLSX.read(data, { type: 'array' });
+          const workbook = XLSX.read(data, { type: 'array', cellDates: false });
 
           if (!workbook.SheetNames.length) {
             throw new Error('Excel file has no sheets');
           }
 
-          // Get the first sheet
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
-
-          // Convert to JSON with headers
-          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: null });
 
           if (jsonData.length === 0) {
             throw new Error('Sheet is empty');
@@ -666,11 +613,8 @@ export class DataTransferPanelComponent {
 
           const columns = jsonData[0] as string[];
           const rows = jsonData.slice(1) as (string | number | boolean | null)[][];
-
-          console.log('Excel parsed successfully:', { columns, rowCount: rows.length });
           resolve({ columns, rows });
         } catch (err) {
-          console.error('Error parsing Excel:', err);
           reject(new Error(`Failed to parse Excel file: ${err instanceof Error ? err.message : 'Unknown error'}`));
         }
       };
@@ -679,33 +623,145 @@ export class DataTransferPanelComponent {
     });
   }
 
-  private initializeColumnForm(columns: string[]): void {
+  private initializeColumnForm(data: ParsedData): void {
     this.columnsFormArray.clear();
-    columns.forEach(column => {
+    const detectionMap: Record<string, DateDetectionResult> = {};
+
+    data.columns.forEach((column, columnIndex) => {
+      const values = data.rows.map((row) => row[columnIndex] ?? null);
+      const detection = this.detectDateColumn(values);
+      detectionMap[column] = detection;
+
       this.columnsFormArray.push(
         this.fb.group({
           source_column: [column],
-          selected: [false],
+          selected: [detection.isLikelyDate],
           prompt: [''],
           isNewColumn: [false],
           target_column: ['']
         })
       );
     });
+
+    this.dateDetection.set(detectionMap);
+  }
+
+  private detectDateColumn(values: (string | number | boolean | null)[]): DateDetectionResult {
+    const sampleValues = values
+      .filter((value) => !this.isEmptyLikeValue(value))
+      .slice(0, 30);
+
+    if (sampleValues.length === 0) {
+      return { isLikelyDate: false, score: 0, sampleCount: 0, matchedCount: 0 };
+    }
+
+    const matchedCount = sampleValues.filter((value) => this.looksLikeDateValue(value)).length;
+    const hasStrongSignal = sampleValues.some((value) => this.hasStrongDateSignal(value));
+    const score = matchedCount / sampleValues.length;
+    const isLikelyDate = hasStrongSignal && sampleValues.length >= 3 && matchedCount >= 3 && score >= 0.6;
+
+    return {
+      isLikelyDate,
+      score,
+      sampleCount: sampleValues.length,
+      matchedCount
+    };
+  }
+
+  private isEmptyLikeValue(value: string | number | boolean | null): boolean {
+    if (value === null || value === undefined) {
+      return true;
+    }
+
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      return normalized === '' || ['n/a', 'na', 'null', 'none', '-', '--'].includes(normalized);
+    }
+
+    return false;
+  }
+
+  private looksLikeDateValue(value: string | number | boolean | null): boolean {
+    if (value === null || typeof value === 'boolean') {
+      return false;
+    }
+
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value)) {
+        return false;
+      }
+
+      if (Number.isInteger(value) && value >= 20000101 && value <= 21001231) {
+        return true;
+      }
+
+      return false;
+    }
+
+    const text = String(value).trim();
+    if (!text) {
+      return false;
+    }
+
+    const patterns = [
+      /^\d{4}-\d{1,2}-\d{1,2}$/, 
+      /^\d{4}\/\d{1,2}\/\d{1,2}$/, 
+      /^\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}$/, 
+      /^\d{8}$/, 
+      /^\d{4}-\d{1,2}-\d{1,2}[t\s]\d{1,2}:\d{2}(:\d{2})?(\.\d+)?(z|[+-]\d{2}:?\d{2})?$/i,
+      /^(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}$/i,
+      /^\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{2,4}$/i
+    ];
+
+    if (patterns.some((pattern) => pattern.test(text))) {
+      return true;
+    }
+
+    const parsed = Date.parse(text);
+    return !Number.isNaN(parsed) && /\d/.test(text);
+  }
+
+  private hasStrongDateSignal(value: string | number | boolean | null): boolean {
+    if (value === null || typeof value === 'boolean') {
+      return false;
+    }
+
+    if (typeof value === 'number') {
+      return Number.isInteger(value) && value >= 20000101 && value <= 21001231;
+    }
+
+    const text = String(value).trim();
+    if (!text) {
+      return false;
+    }
+
+    const strongPatterns = [
+      /^\d{4}-\d{1,2}-\d{1,2}$/,
+      /^\d{4}\/\d{1,2}\/\d{1,2}$/,
+      /^\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}$/,
+      /^\d{8}$/,
+      /^\d{4}-\d{1,2}-\d{1,2}[t\s]\d{1,2}:\d{2}(:\d{2})?(\.\d+)?(z|[+-]\d{2}:?\d{2})?$/i,
+      /^(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}$/i,
+      /^\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{2,4}$/i
+    ];
+
+    return strongPatterns.some((pattern) => pattern.test(text));
   }
 
   onColumnSelectionChange(index: number): void {
     const column = this.columnsFormArray.at(index);
     const isSelected = column.get('selected')?.value;
     const promptControl = column.get('prompt');
-    const sourceColumn = column.get('source_column')?.value;
-    const isDateField = typeof sourceColumn === 'string' && this.isDateColumn(sourceColumn);
-    
-    if (isSelected && isDateField) {
-      promptControl?.setValidators([Validators.required]);
-    } else {
-      promptControl?.clearValidators();
+
+    if (!isSelected) {
+      promptControl?.setValue('');
+      column.get('isNewColumn')?.setValue(false);
+      column.get('target_column')?.setValue('');
+      column.get('target_column')?.clearValidators();
+      column.get('target_column')?.updateValueAndValidity();
     }
+
+    promptControl?.clearValidators();
     promptControl?.updateValueAndValidity();
   }
 
@@ -718,6 +774,7 @@ export class DataTransferPanelComponent {
       targetControl?.setValidators([Validators.required]);
     } else {
       targetControl?.clearValidators();
+      targetControl?.setValue('');
     }
     targetControl?.updateValueAndValidity();
   }
@@ -730,13 +787,7 @@ export class DataTransferPanelComponent {
       return;
     }
 
-    const dateColumnsToTransform = selectedColumns.filter((col: any) => this.isDateColumn(col.source_column));
-
-    const invalidDateColumn = dateColumnsToTransform.find((col: any) => !col.prompt?.trim());
-    if (invalidDateColumn) {
-      this.error.set(`Please enter a prompt for ${invalidDateColumn.source_column}`);
-      return;
-    }
+    const dateColumnsToTransform = selectedColumns.filter((col: any) => !!col.prompt?.trim());
 
     const invalidTargetColumn = dateColumnsToTransform.find((col: any) => col.isNewColumn && !col.target_column?.trim());
     if (invalidTargetColumn) {
@@ -744,7 +795,6 @@ export class DataTransferPanelComponent {
       return;
     }
 
-    // Store selected columns for display
     this.selectedColumnsForDisplay.set(selectedColumns.map((col: any) => col.source_column));
     this.transformedDateColumns.set(dateColumnsToTransform);
 
@@ -754,32 +804,32 @@ export class DataTransferPanelComponent {
       return;
     }
 
-    // If no date columns, just display the selected columns
     if (dateColumnsToTransform.length === 0) {
       const selectedData = this.buildSelectedData(selectedColumns, currentData);
       this.transformedData.set(selectedData);
-      this.initializeTransferForm(selectedData.columns);
       this.error.set(null);
       return;
     }
 
-    // If date columns exist, call the API
     this.isTransforming.set(true);
+    this.transformProgressPercent.set(0);
     this.error.set(null);
 
+    const pipelineId = this.pendingPipelineId();
+    const batchId = this.pendingBatchId();
     const payload = {
-      pipeline_id: this.pipelineId,
-      batch_id: this.batchId,
+      pipeline_id: pipelineId,
+      batch_id: batchId,
       columns: dateColumnsToTransform.map((col: any) => {
-        const columnIndex = currentData ? currentData.columns.indexOf(col.source_column) : -1;
-        const values = columnIndex >= 0 && currentData
+        const columnIndex = currentData.columns.indexOf(col.source_column);
+        const values = columnIndex >= 0
           ? currentData.rows.map((row: any) => row[columnIndex])
           : [];
-        
+
         return {
           source_column: col.source_column,
           target_column: col.isNewColumn ? col.target_column : col.source_column,
-          values: values,
+          values,
           prompt: col.prompt
         };
       })
@@ -800,57 +850,6 @@ export class DataTransferPanelComponent {
       error: (err) => {
         this.error.set(`Transformation failed: ${err.message || 'Unknown error'}`);
         this.isTransforming.set(false);
-      }
-    });
-  }
-
-  private initializeTransferForm(columns: string[]): void {
-    this.transferColumnsFormArray.clear();
-    columns.forEach(column => {
-      this.transferColumnsFormArray.push(
-        this.fb.group({
-          column_name: [column],
-          selected: [false]
-        })
-      );
-    });
-  }
-
-  async transferToDatabase(): Promise<void> {
-    const selectedColumns = this.transferColumnsFormArray.value.filter((col: any) => col.selected);
-
-    if (selectedColumns.length === 0) {
-      this.error.set('Please select at least one column to transfer');
-      return;
-    }
-
-    const transformedDataValue = this.transformedData();
-    if (!transformedDataValue) {
-      this.error.set('No transformed data to transfer');
-      return;
-    }
-
-    this.isTransferingToDb.set(true);
-    this.error.set(null);
-
-    const payload = {
-      pipeline_id: this.pipelineId,
-      batch_id: this.batchId,
-      columns: selectedColumns.map((col: any) => col.column_name),
-      data: transformedDataValue.rows
-    };
-
-    this.http.post(this.dbTransferUrl, payload).subscribe({
-      next: (response) => {
-        this.isTransferingToDb.set(false);
-        this.zone.run(() => {
-          console.log('Database transfer completed:', response);
-          this.error.set(null);
-        });
-      },
-      error: (err) => {
-        this.error.set(`Database transfer failed: ${err.message || 'Unknown error'}`);
-        this.isTransferingToDb.set(false);
       }
     });
   }
@@ -893,4 +892,28 @@ export class DataTransferPanelComponent {
   private getWorksheetName(): string {
     return 'TransformedData';
   }
+
+  private refreshGeneratedIds(): void {
+    this.pendingPipelineId.set(this.generatePipelineId());
+    this.pendingBatchId.set(this.generateBatchId());
+  }
+
+  private generatePipelineId(): string {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return `pipeline-${crypto.randomUUID()}`;
+    }
+
+    const fallback = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+    return `pipeline-${fallback}`;
+  }
+
+  private generateBatchId(): string {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return `batch-${crypto.randomUUID()}`;
+    }
+
+    const fallback = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+    return `batch-${fallback}`;
+  }
 }
+

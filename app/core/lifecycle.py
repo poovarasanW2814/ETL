@@ -1,7 +1,5 @@
 """Application lifecycle handlers."""
 
-from collections.abc import Awaitable, Callable
-
 from fastapi import FastAPI
 from pymongo.errors import PyMongoError
 
@@ -54,7 +52,5 @@ async def on_shutdown() -> None:
 def register_lifecycle_events(app: FastAPI) -> None:
     """Attach startup and shutdown handlers to the FastAPI app."""
 
-    startup_handler: Callable[[], Awaitable[None]] = on_startup
-    shutdown_handler: Callable[[], Awaitable[None]] = on_shutdown
-    app.add_event_handler("startup", startup_handler)
-    app.add_event_handler("shutdown", shutdown_handler)
+    app.router.on_event("startup")(on_startup)
+    app.router.on_event("shutdown")(on_shutdown)

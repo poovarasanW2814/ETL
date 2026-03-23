@@ -9,6 +9,10 @@ import {
   JobRecord,
   JobsResponse,
   JobStatusResponse,
+  DbDatabasesResponse,
+  DbTablePreviewResponse,
+  DbTablesResponse,
+  DbWriteResponse,
   PreviewColumn,
   PromptTestResponse,
 } from '../models';
@@ -70,6 +74,24 @@ export class McpApiService {
     );
   }
 
+  async submitTransformDatesJob(payload: {
+    pipeline_id: string;
+    batch_id: string;
+    columns: Array<{
+      source_column: string;
+      target_column: string;
+      values: Array<string | null>;
+      prompt: string;
+    }>;
+  }): Promise<{ job_id: string; status?: string }> {
+    return firstValueFrom(
+      this.http.post<{ job_id: string; status?: string }>(
+        `${this.baseUrl}/api/v1/transform-dates`,
+        payload,
+      ),
+    );
+  }
+
   async getJobLogs(jobId: string): Promise<{ logs: JobLog[] }> {
     return firstValueFrom(
       this.http.get<{ logs: JobLog[] }>(`${this.baseUrl}/api/v1/mcp-jobs/${jobId}/logs`),
@@ -105,6 +127,76 @@ export class McpApiService {
       this.http.post<PromptTestResponse>(`${this.baseUrl}/api/v1/prompt-tester`, payload, {
         headers: { 'Content-Type': 'application/json' },
       }),
+    );
+  }
+
+  async getDatabases(payload: {
+    db_type: string;
+    connection_uri: string;
+  }): Promise<DbDatabasesResponse> {
+    return firstValueFrom(
+      this.http.post<DbDatabasesResponse>(
+        `${this.baseUrl}/api/v1/db-transfer/databases`,
+        payload,
+      ),
+    );
+  }
+
+  async getSourceTables(payload: {
+    db_type: string;
+    connection_uri: string;
+    database_name: string;
+  }): Promise<DbTablesResponse> {
+    return firstValueFrom(
+      this.http.post<DbTablesResponse>(
+        `${this.baseUrl}/api/v1/db-transfer/source/tables`,
+        payload,
+      ),
+    );
+  }
+
+  async previewSourceTable(payload: {
+    db_type: string;
+    connection_uri: string;
+    database_name: string;
+    table_name: string;
+    limit?: number | null;
+  }): Promise<DbTablePreviewResponse> {
+    return firstValueFrom(
+      this.http.post<DbTablePreviewResponse>(
+        `${this.baseUrl}/api/v1/db-transfer/source/preview`,
+        payload,
+      ),
+    );
+  }
+
+  async getDestinationTables(payload: {
+    db_type: string;
+    connection_uri: string;
+    database_name: string;
+  }): Promise<DbTablesResponse> {
+    return firstValueFrom(
+      this.http.post<DbTablesResponse>(
+        `${this.baseUrl}/api/v1/db-transfer/destination/tables`,
+        payload,
+      ),
+    );
+  }
+
+  async writeDestinationTable(payload: {
+    db_type: string;
+    connection_uri: string;
+    database_name: string;
+    table_name: string;
+    write_mode: string;
+    columns: string[];
+    rows: Record<string, string | number | boolean | object | null>[];
+  }): Promise<DbWriteResponse> {
+    return firstValueFrom(
+      this.http.post<DbWriteResponse>(
+        `${this.baseUrl}/api/v1/db-transfer/destination/write`,
+        payload,
+      ),
     );
   }
 

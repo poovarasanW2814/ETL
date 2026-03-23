@@ -81,6 +81,32 @@ Completed items:
 
 The project now supports end-to-end ETL-facing asynchronous date transformation with persistent MongoDB-backed job tracking. The service can accept batch requests, resolve target formats from prompts, transform mixed-format date values, execute work in Celery background tasks, persist job metadata for ETL observability, and expose job status retrieval through the API.
 
+## Phase 7 - Dedicated Mongo DB To DB Transfer Flow
+
+Status: Completed
+
+Completed items:
+
+- Added dedicated MongoDB source connection and collection-listing APIs
+- Added source collection preview API for tabular UI rendering
+- Added destination MongoDB collection-listing API
+- Added destination write API supporting create, append, and replace modes
+- Added a separate Angular Mongo transfer page and route
+- Reused the existing async date transformation job flow for Mongo-selected date columns
+- Added destination write mode selection in the Mongo transfer UI
+
+## Phase 8 - Multi-Database Transfer Expansion
+
+Status: Completed
+
+Completed items:
+
+- Refactored the transfer API surface from Mongo-specific routes to generic DB transfer routes
+- Added MySQL database discovery, table listing, preview, and destination write support
+- Kept MongoDB support working behind the same generic DB transfer API
+- Added MySQL to the DB type dropdown in the shared DB transfer UI
+- Updated the DB transfer UI to use generic table or collection terminology
+
 ## Update Rule
 
 This file must be updated whenever a new feature, module, or major infrastructure capability is implemented.

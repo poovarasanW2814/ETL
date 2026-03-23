@@ -77,9 +77,16 @@ import { StatusBadgeComponent } from '../shared/status-badge.component';
                 (click)="handleRetry()"
                 [disabled]="retrying"
                 class="rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60 dark:text-slate-950"
+                *ngIf="mergedJob?.retry_available"
               >
                 {{ retrying ? 'Retrying...' : 'Retry job' }}
               </button>
+              <span
+                *ngIf="mergedJob?.retry_available"
+                class="text-xs font-medium text-slate-500 dark:text-slate-400"
+              >
+                Retry available for 24 hours while payload is cached.
+              </span>
               <button
                 type="button"
                 (click)="handleDelete()"
@@ -410,6 +417,7 @@ export class JobDetailsComponent implements OnInit, OnDestroy {
       this.preview = previewData.columns ?? [];
       this.error = '';
     } catch (error: unknown) {
+      console.error('Job details load failed', error);
       this.error = this.resolveError(
         error,
         'Unable to load job details. Ensure the backend exposes /api/v1/mcp-jobs/{job_id}.',
@@ -473,9 +481,29 @@ export class JobDetailsComponent implements OnInit, OnDestroy {
   }
 
   private resolveError(error: unknown, fallback: string): string {
-    if (typeof error === 'object' && error && 'error' in error) {
-      const inner = (error as { error?: { detail?: string } }).error;
-      return inner?.detail ?? fallback;
+    if (typeof error === 'object' && error) {
+      const httpError = error as {
+        status?: number;
+        statusText?: string;
+        message?: string;
+        error?: { detail?: string } | string;
+      };
+
+      if (typeof httpError.error === 'object' && httpError.error?.detail) {
+        return httpError.error.detail;
+      }
+
+      if (typeof httpError.error === 'string' && httpError.error.trim()) {
+        return httpError.error;
+      }
+
+      if (httpError.status && httpError.statusText) {
+        return `Unable to load job details (${httpError.status} ${httpError.statusText}).`;
+      }
+
+      if (httpError.message) {
+        return httpError.message;
+      }
     }
 
     return fallback;

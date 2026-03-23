@@ -36,6 +36,7 @@ export interface JobRecord {
   timestamps?: JobTimestamps;
   payload?: unknown;
   prompt_insights?: PromptInsight[];
+  retry_available?: boolean;
 }
 
 export interface JobsResponse {
@@ -69,6 +70,7 @@ export interface PreviewColumn {
 
 export interface JobStatusResponse extends Partial<JobRecord> {
   result?: unknown;
+  error?: string | null;
 }
 
 export interface StatusBreakdownItem {
@@ -107,4 +109,44 @@ export interface PromptTestResponse {
   detected_format?: string | null;
   target_format?: string | null;
   transformed_values: Array<string | null>;
+}
+
+export interface MongoCollectionItem {
+  name: string;
+}
+
+export interface MongoDatabaseItem {
+  name: string;
+}
+
+export interface DbDatabasesResponse {
+  db_type: string;
+  databases: MongoDatabaseItem[];
+}
+
+export interface DbTablesResponse {
+  db_type: string;
+  database_name: string;
+  tables: MongoCollectionItem[];
+}
+
+export interface MongoPreviewRow {
+  values: Record<string, string | number | boolean | object | null>;
+}
+
+export interface DbTablePreviewResponse {
+  db_type: string;
+  database_name: string;
+  table_name: string;
+  columns: string[];
+  rows: MongoPreviewRow[];
+  total_rows: number;
+}
+
+export interface DbWriteResponse {
+  db_type: string;
+  database_name: string;
+  table_name: string;
+  write_mode: string;
+  rows_written: number;
 }

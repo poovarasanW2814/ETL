@@ -7,6 +7,7 @@
 - Add worker health and queue-depth visibility
 - Add operational metrics for job throughput and failure rates
 - Add structured logging consistency between FastAPI and Celery worker processes
+- Add audit logging for user-supplied Mongo source and destination transfer operations
 
 ## Phase 8 - Testing
 
@@ -15,6 +16,10 @@
 - API contract tests
 - Celery worker execution tests
 - MongoDB repository tests
+- Dedicated Mongo transfer endpoint tests
+- Mongo write-mode behavior tests for create, append, and replace flows
+- MySQL transfer endpoint tests
+- MySQL create, append, and replace mode tests
 - End-to-end status persistence tests
 - Performance and load benchmarks as automated tests
 
@@ -33,6 +38,7 @@
 - Add request/result retention policy for Redis-backed job data
 - Add retention and archival policy for MongoDB job documents
 - Add input size limits and request throttling safeguards
+- Add credential-handling safeguards for user-supplied Mongo connection strings in the DB-to-DB flow
 
 ## Maintenance Rule
 

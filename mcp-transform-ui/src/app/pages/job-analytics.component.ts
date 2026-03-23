@@ -330,6 +330,7 @@ export class JobAnalyticsComponent implements OnInit, OnDestroy {
               display: false,
             },
             ticks: {
+              display: false,
               color: '#64748b',
               maxRotation: compactView ? 22 : 0,
               minRotation: compactView ? 22 : 0,
